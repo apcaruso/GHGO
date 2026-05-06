@@ -1,0 +1,62 @@
+# Go build artifacts
+/ghgo
+/bin/
+/build/
+/dist/
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Local SQLite databases
+/data/*.sqlite
+/data/*.sqlite-*
+/data/*.db
+/data/*.db-*
+
+# Generated reports, graphs, and exports
+/reports/
+/graphs/
+/exports/
+/generated/
+/generated-reports/
+/generated-graphs/
+/output/
+/out/
+*.report.pdf
+*.report.html
+*.graph.png
+*.graph.svg
+*.export.csv
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+tmp/
+temp/
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+.env/
+
+# IDE and editor metadata
+.idea/
+.vscode/
+*.code-workspace
+
+# Operating system metadata
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
