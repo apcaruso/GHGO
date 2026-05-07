@@ -24,7 +24,7 @@ func TestLookupElectricityLocationFactor(t *testing.T) {
 		FactorValue:  0.2,
 	})
 
-	got, err := NewLookup(st, factorSetID).FindForActivityRecord(context.Background(), electricityRecord())
+	got, err := NewLookup(store.NewRepository(st), factorSetID).FindForActivityRecord(context.Background(), electricityRecord())
 	if err != nil {
 		t.Fatalf("lookup electricity factor: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestLookupNaturalGasDirectSmcOnly(t *testing.T) {
 			FactorValue:  2.0,
 		})
 
-		got, err := NewLookup(st, factorSetID).FindForActivityRecord(context.Background(), naturalGasRecord())
+		got, err := NewLookup(store.NewRepository(st), factorSetID).FindForActivityRecord(context.Background(), naturalGasRecord())
 		if err != nil {
 			t.Fatalf("lookup natural gas factor: %v", err)
 		}
@@ -71,7 +71,7 @@ func TestLookupNaturalGasDirectSmcOnly(t *testing.T) {
 			FactorValue:  0.18,
 		})
 
-		_, err := NewLookup(st, factorSetID).FindForActivityRecord(context.Background(), naturalGasRecord())
+		_, err := NewLookup(store.NewRepository(st), factorSetID).FindForActivityRecord(context.Background(), naturalGasRecord())
 		expectErrorIs(t, err, ErrFactorNotFound)
 	})
 }
@@ -91,7 +91,7 @@ func TestLookupMobileFuelFactor(t *testing.T) {
 		FactorValue:  2.51,
 	})
 
-	lookup := NewLookup(st, factorSetID)
+	lookup := NewLookup(store.NewRepository(st), factorSetID)
 	got, err := lookup.FindForActivityRecord(context.Background(), mobileFuelRecord("diesel"))
 	if err != nil {
 		t.Fatalf("lookup diesel factor: %v", err)
@@ -137,7 +137,7 @@ func TestLookupVehicleDistanceFactor(t *testing.T) {
 		FactorValue:      0.25,
 	})
 
-	lookup := NewLookup(st, factorSetID)
+	lookup := NewLookup(store.NewRepository(st), factorSetID)
 	got, err := lookup.FindForActivityRecord(context.Background(), vehicleDistanceRecord("car", "small", "petrol"))
 	if err != nil {
 		t.Fatalf("lookup car factor: %v", err)
@@ -193,7 +193,7 @@ func TestLookupMotorbikeGenericFactor(t *testing.T) {
 		FactorValue:      0.10,
 	})
 
-	got, err := NewLookup(st, factorSetID).FindForActivityRecord(context.Background(), vehicleDistanceRecord("motorbike", "average", ""))
+	got, err := NewLookup(store.NewRepository(st), factorSetID).FindForActivityRecord(context.Background(), vehicleDistanceRecord("motorbike", "average", ""))
 	if err != nil {
 		t.Fatalf("lookup motorbike factor: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestLookupRefrigerantFactor(t *testing.T) {
 		FactorValue:  2088,
 	})
 
-	lookup := NewLookup(st, factorSetID)
+	lookup := NewLookup(store.NewRepository(st), factorSetID)
 	got, err := lookup.FindForActivityRecord(context.Background(), refrigerantRecord("R410A"))
 	if err != nil {
 		t.Fatalf("lookup R410A factor: %v", err)
@@ -243,7 +243,7 @@ func TestLookupUnsupportedActivity(t *testing.T) {
 		GHG:          "kgCO2e",
 		FactorValue:  0.2,
 	})
-	lookup := NewLookup(st, factorSetID)
+	lookup := NewLookup(store.NewRepository(st), factorSetID)
 
 	unknown := electricityRecord()
 	unknown.SourceKind = domain.ActivitySourceKind("unknown")

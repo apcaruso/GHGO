@@ -7,19 +7,19 @@ import (
 	"strconv"
 
 	"ghgo/internal/domain"
-	"ghgo/internal/store"
+	"ghgo/internal/ports"
 	"ghgo/internal/vocab"
 )
 
 type Builder struct {
-	Store *store.Store
+	Store ports.Store
 }
 
 type BuildOptions struct {
 	CalculationRunID string
 }
 
-func NewBuilder(st *store.Store) *Builder {
+func NewBuilder(st ports.Store) *Builder {
 	return &Builder{Store: st}
 }
 
@@ -47,7 +47,7 @@ type ReportTables struct {
 type reportData struct {
 	run       *domain.CalculationRun
 	factorSet *domain.FactorSet
-	rows      []store.ReportResultRow
+	rows      []ports.ReportResultRow
 
 	hasLocationBasedComparison bool
 	scope1PrimaryKgCO2e        float64
@@ -72,9 +72,9 @@ func (b *Builder) BuildTables(ctx context.Context, opts BuildOptions) (*ReportTa
 		return nil, err
 	}
 
-	run, err := b.Store.GetCalculationRun(domain.ID(opts.CalculationRunID))
-	if errors.Is(err, store.ErrNotFound) {
-		return nil, fmt.Errorf("calculation run %q: %w", opts.CalculationRunID, store.ErrNotFound)
+	run, err := b.Store.GetCalculationRun(ctx, domain.ID(opts.CalculationRunID))
+	if errors.Is(err, ports.ErrNotFound) {
+		return nil, fmt.Errorf("calculation run %q: %w", opts.CalculationRunID, ports.ErrNotFound)
 	}
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (b *Builder) BuildTables(ctx context.Context, opts BuildOptions) (*ReportTa
 		return nil, fmt.Errorf("calculation run %q status is %q: %w", run.ID, run.Status, ErrRunNotCompleted)
 	}
 
-	factorSet, err := b.Store.GetFactorSet(run.FactorSetID)
+	factorSet, err := b.Store.GetFactorSet(ctx, run.FactorSetID)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (b *Builder) BuildTables(ctx context.Context, opts BuildOptions) (*ReportTa
 	}, nil
 }
 
-func newReportData(run *domain.CalculationRun, factorSet *domain.FactorSet, rows []store.ReportResultRow) reportData {
+func newReportData(run *domain.CalculationRun, factorSet *domain.FactorSet, rows []ports.ReportResultRow) reportData {
 	data := reportData{
 		run:                      run,
 		factorSet:                factorSet,

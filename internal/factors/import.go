@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"ghgo/internal/domain"
-	"ghgo/internal/store"
+	"ghgo/internal/ports"
 )
 
 type ImportOptions struct {
@@ -26,7 +26,7 @@ type ImportSummary struct {
 	Warnings     []string
 }
 
-func ImportDEFRA2025(ctx context.Context, st *store.Store, path string, opts ImportOptions) (ImportSummary, error) {
+func ImportDEFRA2025(ctx context.Context, st ports.Store, path string, opts ImportOptions) (ImportSummary, error) {
 	var summary ImportSummary
 	if st == nil {
 		return summary, fmt.Errorf("store is required")
@@ -35,13 +35,13 @@ func ImportDEFRA2025(ctx context.Context, st *store.Store, path string, opts Imp
 		return summary, fmt.Errorf("DEFRA 2025 workbook path is required")
 	}
 
-	existing, err := st.FindFactorSetBySourceYearVersion(defra2025Source, defra2025Year, defra2025Version)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	existing, err := st.FindFactorSetBySourceYearVersion(ctx, defra2025Source, defra2025Year, defra2025Version)
+	if err != nil && !errors.Is(err, ports.ErrNotFound) {
 		return summary, err
 	}
 	if existing != nil {
 		summary.FactorSetID = existing.ID
-		count, err := st.CountEmissionFactorsBySet(existing.ID)
+		count, err := st.CountEmissionFactorsBySet(ctx, existing.ID)
 		if err != nil {
 			return summary, err
 		}
@@ -58,7 +58,7 @@ func ImportDEFRA2025(ctx context.Context, st *store.Store, path string, opts Imp
 	summary.RowsSkipped = parsed.RowsSkipped
 	summary.Warnings = parsed.Warnings
 
-	if err := st.WithTx(ctx, func(tx *store.Store) error {
+	if err := st.WithTx(ctx, func(tx ports.Store) error {
 		factorSet := existing
 		if factorSet == nil {
 			factorSet = &domain.FactorSet{
@@ -70,13 +70,13 @@ func ImportDEFRA2025(ctx context.Context, st *store.Store, path string, opts Imp
 				ImportedAt:   time.Now().UTC(),
 				MetadataJSON: `{}`,
 			}
-			if err := tx.CreateFactorSet(*factorSet); err != nil {
+			if err := tx.CreateFactorSet(ctx, *factorSet); err != nil {
 				return err
 			}
 		}
 
 		if opts.Force && existing != nil {
-			if err := tx.DeleteEmissionFactorsBySet(factorSet.ID); err != nil {
+			if err := tx.DeleteEmissionFactorsBySet(ctx, factorSet.ID); err != nil {
 				return err
 			}
 		}
@@ -86,7 +86,7 @@ func ImportDEFRA2025(ctx context.Context, st *store.Store, path string, opts Imp
 			if err != nil {
 				return err
 			}
-			if err := tx.CreateEmissionFactor(candidate.emissionFactor(id, factorSet.ID)); err != nil {
+			if err := tx.CreateEmissionFactor(ctx, candidate.emissionFactor(id, factorSet.ID)); err != nil {
 				return err
 			}
 		}

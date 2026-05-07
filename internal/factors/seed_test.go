@@ -2,15 +2,40 @@ package factors
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
+	"ghgo/factorpacks"
+	"ghgo/internal/store"
 	"ghgo/internal/vocab"
 )
+
+func TestDefaultFactorPackIsVersionedData(t *testing.T) {
+	pack, err := LoadFactorPack(factorpacks.FS, defaultFactorPackPath)
+	if err != nil {
+		t.Fatalf("load default factor pack: %v", err)
+	}
+	if pack.ID != defra2025FactorSetID || pack.Name != defra2025Name || pack.Source != defra2025Source || pack.Year != defra2025Year || pack.Version != defra2025Version {
+		t.Fatalf("pack identity = %#v, want DEFRA/DESNZ 2025 identity", pack)
+	}
+	if len(pack.Rows) != 80 {
+		t.Fatalf("pack row count = %d, want 80", len(pack.Rows))
+	}
+
+	var metadata map[string]bool
+	if err := json.Unmarshal(pack.Metadata, &metadata); err != nil {
+		t.Fatalf("pack metadata: %v", err)
+	}
+	if !metadata["normalized"] || !metadata["seeded"] {
+		t.Fatalf("pack metadata = %#v, want normalized and seeded flags", metadata)
+	}
+}
 
 func TestEnsureDefaultFactorsFreshDatabaseIsIdempotent(t *testing.T) {
 	st := newTestStore(t)
 
-	factorSet, err := EnsureDefaultFactors(context.Background(), st)
+	repo := store.NewRepository(st)
+	factorSet, err := EnsureDefaultFactors(context.Background(), repo)
 	if err != nil {
 		t.Fatalf("ensure default factors: %v", err)
 	}
@@ -25,7 +50,7 @@ func TestEnsureDefaultFactorsFreshDatabaseIsIdempotent(t *testing.T) {
 		t.Fatalf("factor count = 0, want seeded factors")
 	}
 
-	second, err := EnsureDefaultFactors(context.Background(), st)
+	second, err := EnsureDefaultFactors(context.Background(), repo)
 	if err != nil {
 		t.Fatalf("ensure default factors second call: %v", err)
 	}
@@ -43,11 +68,12 @@ func TestEnsureDefaultFactorsFreshDatabaseIsIdempotent(t *testing.T) {
 
 func TestEnsureDefaultFactorsSupportsLookups(t *testing.T) {
 	st := newTestStore(t)
-	factorSet, err := EnsureDefaultFactors(context.Background(), st)
+	repo := store.NewRepository(st)
+	factorSet, err := EnsureDefaultFactors(context.Background(), repo)
 	if err != nil {
 		t.Fatalf("ensure default factors: %v", err)
 	}
-	lookup := NewLookup(st, factorSet.ID)
+	lookup := NewLookup(repo, factorSet.ID)
 
 	if _, err := lookup.FindElectricityLocationFactor(context.Background()); err != nil {
 		t.Fatalf("lookup electricity: %v", err)

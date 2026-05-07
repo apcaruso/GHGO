@@ -12,13 +12,15 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"ghgo/internal/domain"
+	"ghgo/internal/store"
 )
 
 func TestImportDEFRA2025SyntheticWorkbook(t *testing.T) {
 	st := newTestStore(t)
 	path := writeSyntheticWorkbook(t, syntheticHeaders(), syntheticRows())
 
-	summary, err := ImportDEFRA2025(context.Background(), st, path, ImportOptions{})
+	repo := store.NewRepository(st)
+	summary, err := ImportDEFRA2025(context.Background(), repo, path, ImportOptions{})
 	if err != nil {
 		t.Fatalf("import DEFRA 2025: %v", err)
 	}
@@ -78,7 +80,7 @@ func TestImportDEFRA2025SyntheticWorkbook(t *testing.T) {
 		t.Fatalf("R410A input unit = %q, want kg", refrigerant.InputUnit)
 	}
 
-	secondSummary, err := ImportDEFRA2025(context.Background(), st, path, ImportOptions{})
+	secondSummary, err := ImportDEFRA2025(context.Background(), repo, path, ImportOptions{})
 	if err != nil {
 		t.Fatalf("second import DEFRA 2025: %v", err)
 	}
@@ -93,7 +95,7 @@ func TestImportDEFRA2025SyntheticWorkbook(t *testing.T) {
 		t.Fatalf("factor count after second import = %d, want 8", count)
 	}
 
-	forceSummary, err := ImportDEFRA2025(context.Background(), st, path, ImportOptions{Force: true})
+	forceSummary, err := ImportDEFRA2025(context.Background(), repo, path, ImportOptions{Force: true})
 	if err != nil {
 		t.Fatalf("force import DEFRA 2025: %v", err)
 	}
@@ -124,7 +126,7 @@ func TestImportDEFRA2025MissingRequiredHeaders(t *testing.T) {
 	headers := syntheticHeaders()
 	path := writeSyntheticWorkbook(t, headers[:len(headers)-1], nil)
 
-	_, err := ImportDEFRA2025(context.Background(), st, path, ImportOptions{})
+	_, err := ImportDEFRA2025(context.Background(), store.NewRepository(st), path, ImportOptions{})
 	if err == nil {
 		t.Fatalf("missing headers import succeeded")
 	}

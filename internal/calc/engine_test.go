@@ -13,6 +13,7 @@ import (
 	"ghgo/internal/domain"
 	"ghgo/internal/factors"
 	"ghgo/internal/input"
+	"ghgo/internal/ports"
 	"ghgo/internal/store"
 	"ghgo/internal/vocab"
 )
@@ -288,14 +289,14 @@ func TestNoXLSXDependency(t *testing.T) {
 
 func TestCalculationWithSeededDefaultFactors(t *testing.T) {
 	f := newCalcFixture(t)
-	factorSet, err := factors.EnsureDefaultFactors(context.Background(), f.store)
+	factorSet, err := factors.EnsureDefaultFactors(context.Background(), f.repo)
 	if err != nil {
 		t.Fatalf("ensure default factors: %v", err)
 	}
 
 	facilityID := string(f.facilityID)
 	parsed := input.Parse(vocab.InputNaturalGasMonthlySmc, "January\t100")
-	_, err = input.CommitParsedInput(context.Background(), f.store, input.CommitContext{
+	_, err = input.CommitParsedInput(context.Background(), f.repo, input.CommitContext{
 		OrganizationID:    string(f.orgID),
 		ReportingPeriodID: string(f.periodID),
 		FacilityID:        &facilityID,
@@ -308,7 +309,7 @@ func TestCalculationWithSeededDefaultFactors(t *testing.T) {
 		t.Fatalf("commit natural gas: %v", err)
 	}
 
-	engine := NewEngine(f.store, factors.NewLookup(f.store, factorSet.ID))
+	engine := NewEngine(f.repo, factors.NewLookup(f.repo, factorSet.ID))
 	result, err := engine.Run(context.Background(), RunOptions{
 		OrganizationID:    string(f.orgID),
 		ReportingPeriodID: string(f.periodID),
@@ -324,6 +325,7 @@ func TestCalculationWithSeededDefaultFactors(t *testing.T) {
 
 type calcFixture struct {
 	store       *store.Store
+	repo        ports.Store
 	engine      *Engine
 	orgID       domain.ID
 	facilityID  domain.ID
@@ -348,8 +350,10 @@ func newCalcFixture(t *testing.T) *calcFixture {
 
 	st := store.New(db)
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	repo := store.NewRepository(st)
 	f := &calcFixture{
 		store:       st,
+		repo:        repo,
 		orgID:       "org-1",
 		facilityID:  "facility-1",
 		periodID:    "period-2026",
@@ -399,7 +403,7 @@ func newCalcFixture(t *testing.T) *calcFixture {
 		t.Fatalf("create factor set: %v", err)
 	}
 
-	f.engine = NewEngine(st, factors.NewLookup(st, string(f.factorSetID)))
+	f.engine = NewEngine(repo, factors.NewLookup(repo, string(f.factorSetID)))
 	return f
 }
 

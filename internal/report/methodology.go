@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"ghgo/internal/domain"
-	"ghgo/internal/store"
+	"ghgo/internal/ports"
 	"ghgo/internal/vocab"
 )
 
@@ -120,7 +120,7 @@ func buildValidationNotes(data reportData) ValidationNotesTable {
 	return ValidationNotesTable{Rows: rows}
 }
 
-func firstFactorSource(rows []store.ReportResultRow, vector domain.ActivityVector) string {
+func firstFactorSource(rows []ports.ReportResultRow, vector domain.ActivityVector) string {
 	for _, row := range rows {
 		result := row.CalculationResult
 		if result.Vector == vector && result.FactorSource != "" {
@@ -156,7 +156,7 @@ func snapshotMobileMethod(snapshotJSON string) domain.ActivityMethod {
 	return ""
 }
 
-func hasZeroMarketBasedElectricity(rows []store.ReportResultRow) bool {
+func hasZeroMarketBasedElectricity(rows []ports.ReportResultRow) bool {
 	for _, row := range rows {
 		result := row.CalculationResult
 		if result.Vector == domain.ActivityVectorElectricity && result.Method == domain.ActivityMethodMarketBased && result.EmissionsKgCO2e == 0 {
@@ -166,7 +166,7 @@ func hasZeroMarketBasedElectricity(rows []store.ReportResultRow) bool {
 	return false
 }
 
-func hasBEVMobileDistance(rows []store.ReportResultRow) bool {
+func hasBEVMobileDistance(rows []ports.ReportResultRow) bool {
 	for _, row := range rows {
 		record := row.ActivityRecord
 		result := row.CalculationResult

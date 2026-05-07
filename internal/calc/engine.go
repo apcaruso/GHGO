@@ -12,11 +12,11 @@ import (
 
 	"ghgo/internal/domain"
 	"ghgo/internal/factors"
-	"ghgo/internal/store"
+	"ghgo/internal/ports"
 )
 
 type Engine struct {
-	Store  *store.Store
+	Store  ports.Store
 	Lookup *factors.Lookup
 }
 
@@ -33,7 +33,7 @@ type RunResult struct {
 	LocationBasedTotalKgCO2e *float64
 }
 
-func NewEngine(st *store.Store, lookup *factors.Lookup) *Engine {
+func NewEngine(st ports.Store, lookup *factors.Lookup) *Engine {
 	return &Engine{Store: st, Lookup: lookup}
 }
 
@@ -46,8 +46,8 @@ func (e *Engine) Run(ctx context.Context, opts RunOptions) (RunResult, error) {
 		return result, err
 	}
 
-	err := e.Store.WithTx(ctx, func(tx *store.Store) error {
-		factorSet, records, periodSettings, electricitySettings, err := e.validateAndLoadInputs(tx, opts)
+	err := e.Store.WithTx(ctx, func(tx ports.Store) error {
+		factorSet, records, periodSettings, electricitySettings, err := e.validateAndLoadInputs(ctx, tx, opts)
 		if err != nil {
 			return err
 		}
@@ -71,7 +71,7 @@ func (e *Engine) Run(ctx context.Context, opts RunOptions) (RunResult, error) {
 			StartedAt:            startedAt,
 			SettingsSnapshotJSON: snapshotJSON,
 		}
-		if err := tx.CreateCalculationRun(run); err != nil {
+		if err := tx.CreateCalculationRun(ctx, run); err != nil {
 			return err
 		}
 
@@ -83,13 +83,13 @@ func (e *Engine) Run(ctx context.Context, opts RunOptions) (RunResult, error) {
 			return err
 		}
 		for _, calculationResult := range results {
-			if err := tx.CreateCalculationResult(calculationResult); err != nil {
+			if err := tx.CreateCalculationResult(ctx, calculationResult); err != nil {
 				return err
 			}
 		}
 
 		completedAt := time.Now().UTC()
-		if err := tx.CompleteCalculationRun(run.ID, completedAt); err != nil {
+		if err := tx.CompleteCalculationRun(ctx, run.ID, completedAt); err != nil {
 			return err
 		}
 
@@ -125,16 +125,16 @@ func (e *Engine) validateOptions(opts RunOptions) error {
 	return nil
 }
 
-func (e *Engine) validateAndLoadInputs(tx *store.Store, opts RunOptions) (*domain.FactorSet, []domain.ActivityRecord, *domain.ReportingPeriodSettings, map[string]*domain.ElectricitySettings, error) {
-	factorSet, err := tx.GetFactorSet(domain.ID(opts.FactorSetID))
-	if errors.Is(err, store.ErrNotFound) {
+func (e *Engine) validateAndLoadInputs(ctx context.Context, tx ports.Store, opts RunOptions) (*domain.FactorSet, []domain.ActivityRecord, *domain.ReportingPeriodSettings, map[string]*domain.ElectricitySettings, error) {
+	factorSet, err := tx.GetFactorSet(ctx, domain.ID(opts.FactorSetID))
+	if errors.Is(err, ports.ErrNotFound) {
 		return nil, nil, nil, nil, invalidOptions("factor set %q does not exist", opts.FactorSetID)
 	}
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 
-	records, err := tx.ListActiveActivityRecordsByPeriod(domain.ID(opts.ReportingPeriodID))
+	records, err := tx.ListActiveActivityRecordsByPeriod(ctx, domain.ID(opts.ReportingPeriodID))
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -142,8 +142,8 @@ func (e *Engine) validateAndLoadInputs(tx *store.Store, opts RunOptions) (*domai
 		return nil, nil, nil, nil, ErrNoActiveRecords
 	}
 
-	periodSettings, err := tx.GetReportingPeriodSettings(domain.ID(opts.ReportingPeriodID))
-	if errors.Is(err, store.ErrNotFound) {
+	periodSettings, err := tx.GetReportingPeriodSettings(ctx, domain.ID(opts.ReportingPeriodID))
+	if errors.Is(err, ports.ErrNotFound) {
 		periodSettings = nil
 	} else if err != nil {
 		return nil, nil, nil, nil, err
@@ -153,7 +153,7 @@ func (e *Engine) validateAndLoadInputs(tx *store.Store, opts RunOptions) (*domai
 		return nil, nil, nil, nil, err
 	}
 
-	electricitySettings, err := loadElectricitySettings(tx, opts, records)
+	electricitySettings, err := loadElectricitySettings(ctx, tx, opts, records)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -222,7 +222,7 @@ func isMobileActivityRecord(record domain.ActivityRecord) bool {
 		record.SourceKind == domain.ActivitySourceKindVehicleDistanceKM
 }
 
-func loadElectricitySettings(tx *store.Store, opts RunOptions, records []domain.ActivityRecord) (map[string]*domain.ElectricitySettings, error) {
+func loadElectricitySettings(ctx context.Context, tx ports.Store, opts RunOptions, records []domain.ActivityRecord) (map[string]*domain.ElectricitySettings, error) {
 	settingsByFacility := map[string]*domain.ElectricitySettings{}
 	for _, record := range records {
 		if record.SourceKind != domain.ActivitySourceKindElectricityMonthlyKWh {
@@ -236,8 +236,8 @@ func loadElectricitySettings(tx *store.Store, opts RunOptions, records []domain.
 		if _, ok := settingsByFacility[facilityID]; ok {
 			continue
 		}
-		settings, err := tx.GetElectricitySettings(domain.ID(opts.ReportingPeriodID), domain.ID(facilityID))
-		if errors.Is(err, store.ErrNotFound) {
+		settings, err := tx.GetElectricitySettings(ctx, domain.ID(opts.ReportingPeriodID), domain.ID(facilityID))
+		if errors.Is(err, ports.ErrNotFound) {
 			settingsByFacility[facilityID] = nil
 			continue
 		}

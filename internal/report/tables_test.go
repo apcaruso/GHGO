@@ -322,7 +322,7 @@ func newReportFixture(t *testing.T, status domain.CalculationRunStatus) *reportF
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	f := &reportFixture{
 		store:       st,
-		builder:     NewBuilder(st),
+		builder:     NewBuilder(store.NewRepository(st)),
 		orgID:       "org-1",
 		facilityID:  "facility-1",
 		periodID:    "period-2026",

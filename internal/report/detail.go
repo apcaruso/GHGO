@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"ghgo/internal/domain"
-	"ghgo/internal/store"
+	"ghgo/internal/ports"
 )
 
 type ElectricityDetailTable struct {
@@ -210,7 +210,7 @@ func buildMobileDetail(data reportData) (MobileDetailTable, error) {
 	return table, nil
 }
 
-func detectMobileMethod(rows []store.ReportResultRow) (domain.ActivityMethod, error) {
+func detectMobileMethod(rows []ports.ReportResultRow) (domain.ActivityMethod, error) {
 	method := domain.ActivityMethod("")
 	for _, row := range rows {
 		result := row.CalculationResult
