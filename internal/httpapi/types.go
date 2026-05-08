@@ -206,16 +206,13 @@ type parseInputRequest struct {
 
 type commitInputRequest struct {
 	Context commitContextPayload `json:"context"`
-	Parsed  parseResultPayload   `json:"parsed"`
+	RawText string               `json:"raw_text"`
 }
 
 type commitContextPayload struct {
 	OrganizationID        string              `json:"organization_id"`
 	ReportingPeriodID     string              `json:"reporting_period_id"`
 	FacilityID            *string             `json:"facility_id"`
-	ReportingYear         int                 `json:"reporting_year"`
-	PeriodStart           string              `json:"period_start"`
-	PeriodEnd             string              `json:"period_end"`
 	InputKind             vocab.InputKind     `json:"input_kind"`
 	MobileMethod          domain.MobileMethod `json:"mobile_method"`
 	HasGuaranteesOfOrigin bool                `json:"has_guarantees_of_origin"`
@@ -223,21 +220,10 @@ type commitContextPayload struct {
 }
 
 func (p commitContextPayload) toInput() (input.CommitContext, error) {
-	periodStart, err := parseOptionalTime(p.PeriodStart, "period_start")
-	if err != nil {
-		return input.CommitContext{}, err
-	}
-	periodEnd, err := parseOptionalTime(p.PeriodEnd, "period_end")
-	if err != nil {
-		return input.CommitContext{}, err
-	}
 	return input.CommitContext{
 		OrganizationID:        p.OrganizationID,
 		ReportingPeriodID:     p.ReportingPeriodID,
 		FacilityID:            p.FacilityID,
-		ReportingYear:         p.ReportingYear,
-		PeriodStart:           periodStart,
-		PeriodEnd:             periodEnd,
 		InputKind:             p.InputKind,
 		MobileMethod:          p.MobileMethod,
 		HasGuaranteesOfOrigin: p.HasGuaranteesOfOrigin,

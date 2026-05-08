@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"ghgo/internal/domain"
@@ -15,20 +16,30 @@ import (
 )
 
 func CommitParsedInput(ctx context.Context, st ports.Store, c CommitContext, parsed ParseResult) (CommitResult, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	parsed = trustedParseResult(c.InputKind, parsed)
 	result := CommitResult{
 		RowsTotal: parsed.RowsTotal,
 		RowsValid: parsed.RowsValid,
 		RowsError: parsed.RowsError,
 	}
 	if st == nil {
-		return result, fmt.Errorf("store is required")
-	}
-	if err := validateCommitRequest(c, parsed); err != nil {
-		return result, fmt.Errorf("%w: %v", ErrInvalidCommit, err)
+		return result, invalidCommitf("store is required")
 	}
 
 	txResult := result
 	if err := st.WithTx(ctx, func(tx ports.Store) error {
+		trustedContext, err := trustedCommitContext(ctx, tx, c)
+		if err != nil {
+			return err
+		}
+		if err := validateCommitRequest(trustedContext, parsed); err != nil {
+			return invalidCommit(err)
+		}
+
+		c = trustedContext
 		if err := validateStoredSettings(ctx, tx, c); err != nil {
 			return err
 		}
@@ -86,6 +97,99 @@ func CommitParsedInput(ctx context.Context, st ports.Store, c CommitContext, par
 	return txResult, nil
 }
 
+func normalizeParseResultCounts(parsed ParseResult) ParseResult {
+	parsed.RowsTotal = len(parsed.Rows)
+	parsed.RowsValid = 0
+	parsed.RowsError = 0
+	for _, row := range parsed.Rows {
+		if len(row.Errors) > 0 {
+			parsed.RowsError++
+			continue
+		}
+		parsed.RowsValid++
+	}
+	return parsed
+}
+
+func trustedParseResult(inputKind vocab.InputKind, parsed ParseResult) ParseResult {
+	if parsed.RawText == "" {
+		return normalizeParseResultCounts(parsed)
+	}
+	return normalizeParseResultCounts(Parse(inputKind, parsed.RawText))
+}
+
+func trustedCommitContext(ctx context.Context, st ports.Store, c CommitContext) (CommitContext, error) {
+	if st == nil {
+		return c, invalidCommitf("store is required")
+	}
+
+	organizationID := strings.TrimSpace(c.OrganizationID)
+	if organizationID == "" {
+		return c, invalidCommitf("missing organization ID")
+	}
+	reportingPeriodID := strings.TrimSpace(c.ReportingPeriodID)
+	if reportingPeriodID == "" {
+		return c, invalidCommitf("missing reporting period ID")
+	}
+
+	period, err := st.GetReportingPeriod(ctx, domain.ID(reportingPeriodID))
+	if errors.Is(err, ports.ErrNotFound) {
+		return c, invalidCommitf("reporting period %q was not found", reportingPeriodID)
+	}
+	if err != nil {
+		return c, err
+	}
+	if domain.ID(organizationID) != period.OrganizationID {
+		return c, invalidCommitf("reporting period belongs to organization %q, not %q", period.OrganizationID, organizationID)
+	}
+
+	c.OrganizationID = string(period.OrganizationID)
+	c.ReportingPeriodID = string(period.ID)
+	c.ReportingYear = period.Year
+	c.PeriodStart = period.StartsOn
+	c.PeriodEnd = period.EndsOn
+
+	if c.FacilityID != nil {
+		facilityID := strings.TrimSpace(*c.FacilityID)
+		if facilityID == "" {
+			return c, invalidCommitf("facility ID cannot be empty")
+		}
+		if err := validateFacilityBelongsToOrganization(ctx, st, period.OrganizationID, domain.ID(facilityID)); err != nil {
+			return c, err
+		}
+		c.FacilityID = &facilityID
+	}
+
+	return c, nil
+}
+
+func validateFacilityBelongsToOrganization(ctx context.Context, st ports.Store, organizationID domain.ID, facilityID domain.ID) error {
+	facilities, err := st.ListFacilitiesByOrganization(ctx, organizationID)
+	if err != nil {
+		return err
+	}
+	for _, facility := range facilities {
+		if facility.ID == facilityID {
+			return nil
+		}
+	}
+	return invalidCommitf("facility %q does not belong to organization %q", facilityID, organizationID)
+}
+
+func invalidCommit(err error) error {
+	if err == nil {
+		return ErrInvalidCommit
+	}
+	if errors.Is(err, ErrInvalidCommit) {
+		return err
+	}
+	return fmt.Errorf("%w: %v", ErrInvalidCommit, err)
+}
+
+func invalidCommitf(format string, args ...any) error {
+	return invalidCommit(fmt.Errorf(format, args...))
+}
+
 func validateStoredSettings(ctx context.Context, st ports.Store, c CommitContext) error {
 	expected, ok := expectedMobileMethod(c.InputKind)
 	if !ok {
@@ -100,7 +204,7 @@ func validateStoredSettings(ctx context.Context, st ports.Store, c CommitContext
 		return err
 	}
 	if settings.MobileMethod != expected {
-		return fmt.Errorf("reporting period is set to %s, so %s data cannot be saved", mobileMethodDisplayLabel(settings.MobileMethod), inputKindDisplayLabel(c.InputKind))
+		return invalidCommitf("reporting period is set to %s, so %s data cannot be saved", mobileMethodDisplayLabel(settings.MobileMethod), inputKindDisplayLabel(c.InputKind))
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ package input
 
 import (
 	"context"
+	"errors"
 	"math"
 	"path/filepath"
 	"testing"
@@ -286,6 +287,81 @@ func TestStoredMobileMethodRejectsMismatch(t *testing.T) {
 		t.Fatalf("stored distance_based method accepted mobile_fuel_litres")
 	}
 	assertNoBatchesOrRecords(t, fixture)
+}
+
+func TestCommitUsesTrustedStoredContext(t *testing.T) {
+	t.Run("reparses raw text before writing", func(t *testing.T) {
+		fixture := newCommitFixture(t, true)
+		parsed := Parse(vocab.InputElectricityMonthlyKWh, "January\t100")
+		parsed.Rows[0].Normalized["amount"] = "999"
+		parsed.RowsTotal = 99
+		parsed.RowsValid = 99
+
+		result, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), fixture.commitContext(vocab.InputElectricityMonthlyKWh), parsed)
+		if err != nil {
+			t.Fatalf("commit electricity: %v", err)
+		}
+		if result.RowsTotal != 1 || result.RowsValid != 1 {
+			t.Fatalf("commit counts = %#v, want reparsed counts", result)
+		}
+
+		records := requireActivityRecords(t, fixture.st, fixture.periodID, 1)
+		if !floatEqual(records[0].Amount, 100) {
+			t.Fatalf("record amount = %v, want raw text amount 100", records[0].Amount)
+		}
+	})
+
+	t.Run("derives reporting period dates", func(t *testing.T) {
+		fixture := newCommitFixture(t, true)
+		ctx := fixture.commitContext(vocab.InputElectricityMonthlyKWh)
+		ctx.ReportingYear = 2030
+		ctx.PeriodStart = time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
+		ctx.PeriodEnd = time.Date(2030, 12, 31, 0, 0, 0, 0, time.UTC)
+
+		if _, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), ctx, Parse(vocab.InputElectricityMonthlyKWh, "January\t100")); err != nil {
+			t.Fatalf("commit electricity: %v", err)
+		}
+
+		records := requireActivityRecords(t, fixture.st, fixture.periodID, 1)
+		wantStart := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+		wantEnd := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
+		if !records[0].PeriodStart.Equal(wantStart) || !records[0].PeriodEnd.Equal(wantEnd) {
+			t.Fatalf("record period = %s..%s, want %s..%s", records[0].PeriodStart, records[0].PeriodEnd, wantStart, wantEnd)
+		}
+	})
+
+	t.Run("rejects mismatched organization", func(t *testing.T) {
+		fixture := newCommitFixture(t, true)
+		ctx := fixture.commitContext(vocab.InputElectricityMonthlyKWh)
+		ctx.OrganizationID = "other-org"
+
+		_, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), ctx, Parse(vocab.InputElectricityMonthlyKWh, "January\t100"))
+		if !errors.Is(err, ErrInvalidCommit) {
+			t.Fatalf("commit error = %v, want ErrInvalidCommit", err)
+		}
+		assertNoBatchesOrRecords(t, fixture)
+	})
+
+	t.Run("rejects cross organization facility", func(t *testing.T) {
+		fixture := newCommitFixture(t, true)
+		now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+		otherOrganizationID := domain.ID("org-2")
+		otherFacilityID := "facility-2"
+		if err := fixture.st.CreateOrganization(domain.Organization{ID: otherOrganizationID, Name: "Other", CreatedAt: now, UpdatedAt: now}); err != nil {
+			t.Fatalf("create other organization: %v", err)
+		}
+		if err := fixture.st.CreateFacility(domain.Facility{ID: domain.ID(otherFacilityID), OrganizationID: otherOrganizationID, Name: "Other Facility", CountryCode: "IT", CreatedAt: now, UpdatedAt: now}); err != nil {
+			t.Fatalf("create other facility: %v", err)
+		}
+
+		ctx := fixture.commitContext(vocab.InputNaturalGasMonthlySmc)
+		ctx.FacilityID = &otherFacilityID
+		_, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), ctx, Parse(vocab.InputNaturalGasMonthlySmc, "January\t100"))
+		if !errors.Is(err, ErrInvalidCommit) {
+			t.Fatalf("commit error = %v, want ErrInvalidCommit", err)
+		}
+		assertNoBatchesOrRecords(t, fixture)
+	})
 }
 
 func TestSavedDataDisplayQueries(t *testing.T) {

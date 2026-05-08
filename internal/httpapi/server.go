@@ -238,9 +238,9 @@ func (s *server) commitInput(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
-	result, err := s.services.Inputs.CommitParsed(r.Context(), app.CommitParsedInputOptions{
+	result, err := s.services.Inputs.ParseAndCommit(r.Context(), app.ParseAndCommitInputOptions{
 		Context: commitContext,
-		Parsed:  req.Parsed.toInput(),
+		RawText: req.RawText,
 	})
 	if err != nil {
 		writeServiceError(w, err)

@@ -45,9 +45,9 @@ func (s *InputService) CommitParsed(ctx context.Context, opts CommitParsedInputO
 }
 
 func (s *InputService) ParseAndCommit(ctx context.Context, opts ParseAndCommitInputOptions) (input.CommitResult, error) {
-	parsed, err := s.Parse(ctx, ParseInputOptions{InputKind: opts.Context.InputKind, RawText: opts.RawText})
-	if err != nil {
+	if err := checkStore(ctx, s.store); err != nil {
 		return input.CommitResult{}, err
 	}
+	parsed := input.Parse(opts.Context.InputKind, opts.RawText)
 	return s.CommitParsed(ctx, CommitParsedInputOptions{Context: opts.Context, Parsed: parsed})
 }

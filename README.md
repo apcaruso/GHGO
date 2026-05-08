@@ -14,7 +14,7 @@ Main backend capabilities currently present in the codebase:
 - Organization, facility, and reporting period setup.
 - Reporting period settings, including mobile combustion method selection.
 - Spreadsheet-style pasted text parsing and validation.
-- Commit workflows for parsed activity data, including replacement of matching active records.
+- Commit workflows for pasted activity data, including server-side re-parsing and replacement of matching active records.
 - Editable/replaceable saved activity data by saving replacement input.
 - Calculation runs that convert active activity records into emissions results.
 - Report table builders for completed calculation runs.
@@ -35,7 +35,7 @@ Current backend workflow supported by the internal packages:
 3. Configure reporting period settings, especially the mobile combustion method if mobile data will be entered.
 4. Parse activity data from spreadsheet-style text.
 5. Validate parsed rows and fix any blocking errors.
-6. Commit the data. Replacement data supersedes matching active records.
+6. Commit the raw pasted data. The backend re-parses it and supersedes matching active records.
 7. Run a calculation for the reporting period and factor set.
 8. Build report tables for a completed calculation run.
 

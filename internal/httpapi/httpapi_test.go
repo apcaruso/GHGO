@@ -74,6 +74,14 @@ func TestAPIErrorMapping(t *testing.T) {
 	if envelope.Error == nil || envelope.Error.Code != "method_not_allowed" {
 		t.Fatalf("unsupported method error = %#v, want method_not_allowed", envelope.Error)
 	}
+
+	status, envelope = requestRaw(t, handler, http.MethodPost, "/inputs/commit", `{"context":{},"parsed":{}}`)
+	if status != http.StatusBadRequest {
+		t.Fatalf("commit parsed payload status = %d, want %d: %s", status, http.StatusBadRequest, envelopeText(envelope))
+	}
+	if envelope.Error == nil || envelope.Error.Code != "malformed_json" {
+		t.Fatalf("commit parsed payload error = %#v, want malformed_json", envelope.Error)
+	}
 }
 
 func TestNaturalGasWorkflow(t *testing.T) {
@@ -101,12 +109,9 @@ func TestNaturalGasWorkflow(t *testing.T) {
 			OrganizationID:    organization.ID,
 			ReportingPeriodID: period.ID,
 			FacilityID:        &facilityID,
-			ReportingYear:     period.Year,
-			PeriodStart:       period.StartsOn,
-			PeriodEnd:         period.EndsOn,
 			InputKind:         vocab.InputNaturalGasMonthlySmc,
 		},
-		Parsed: parsed,
+		RawText: "Month\tConsumption\nJanuary\t100",
 	})
 	if status != http.StatusOK {
 		t.Fatalf("commit status = %d, want %d: %s", status, http.StatusOK, envelopeText(envelope))
@@ -183,12 +188,9 @@ func TestParseRowErrorsAreOKAndCommitValidationIsBadRequest(t *testing.T) {
 			OrganizationID:    organization.ID,
 			ReportingPeriodID: period.ID,
 			FacilityID:        &facilityID,
-			ReportingYear:     period.Year,
-			PeriodStart:       period.StartsOn,
-			PeriodEnd:         period.EndsOn,
 			InputKind:         vocab.InputNaturalGasMonthlySmc,
 		},
-		Parsed: parsedWithErrors,
+		RawText: "NotAMonth\t100",
 	})
 	if status != http.StatusBadRequest {
 		t.Fatalf("commit invalid parsed status = %d, want %d: %s", status, http.StatusBadRequest, envelopeText(envelope))
@@ -207,7 +209,7 @@ func TestParseRowErrorsAreOKAndCommitValidationIsBadRequest(t *testing.T) {
 	var validParsed parseResultPayload
 	decodeData(t, envelope, &validParsed)
 
-	status, envelope = requestJSON(t, handler, http.MethodPost, "/inputs/commit", commitInputRequest{Parsed: validParsed})
+	status, envelope = requestJSON(t, handler, http.MethodPost, "/inputs/commit", commitInputRequest{RawText: validParsed.RawText})
 	if status != http.StatusBadRequest {
 		t.Fatalf("commit invalid context status = %d, want %d: %s", status, http.StatusBadRequest, envelopeText(envelope))
 	}
