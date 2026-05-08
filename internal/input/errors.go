@@ -1,5 +1,9 @@
 package input
 
+import "errors"
+
+var ErrInvalidCommit = errors.New("invalid input commit")
+
 const (
 	CodeWrongColumnCount             = "wrong_column_count"
 	CodeHeaderInBody                 = "header_in_body"

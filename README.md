@@ -2,7 +2,7 @@
 
 ghgo is a local-first backend engine for greenhouse gas (GHG) activity data entry, emissions calculation, and early-stage reporting.
 
-The project is written in Go and uses SQLite for the current local storage implementation. The desktop interface has been removed; the next architecture direction is an API-first backend with storage abstractions so alternate persistence implementations can be added later.
+The project is written in Go and uses SQLite for the current local storage implementation. The desktop interface has been removed; the backend now exposes frontend-agnostic app services plus a local HTTP API entry point.
 
 ## What The Program Does
 
@@ -71,7 +71,7 @@ This project is not finished yet.
 
 Known limitations:
 
-- There is no user-facing API or UI entrypoint yet; the current executable only initializes the backend database.
+- The HTTP API is intentionally minimal and currently covers setup, pasted input parsing/commit, calculations, reports, and factor-set lookup.
 - Report tables exist, but polished report generation, printing, and export workflows are not complete.
 - Chart dataset tables exist, but graph rendering, printing, and exporting are not implemented.
 - Supported activity categories and conversion factors are intentionally limited.
@@ -82,7 +82,7 @@ Known limitations:
 
 ## Planned Work / TODO
 
-- Expand the API-facing backend service layer into HTTP handlers.
+- Expand API endpoint coverage and harden API documentation.
 - Add storage interfaces and keep SQLite as one implementation.
 - Add report generation/export workflows.
 - Add graph dataset/export workflows.
@@ -110,6 +110,14 @@ go run ./cmd/ghgo
 
 The command opens the configured database, runs migrations, ensures the default DEFRA/DESNZ 2025 factor set exists, prints the initialized database path, and exits.
 
+Run the HTTP API:
+
+```sh
+go run ./cmd/ghgo-api
+```
+
+The API command opens the configured database, runs migrations, seeds the default factor set, and serves HTTP until stopped.
+
 By default, ghgo stores its local SQLite database at:
 
 ```text
@@ -122,6 +130,62 @@ Override the database path:
 GHGO_DB_PATH=/custom/path/ghgo.sqlite go run ./cmd/ghgo
 ```
 
+Override the API listen address:
+
+```sh
+GHGO_HTTP_ADDR=127.0.0.1:9090 go run ./cmd/ghgo-api
+```
+
+HTTP API defaults:
+
+- `GHGO_DB_PATH`: `data/ghgo.sqlite`
+- `GHGO_HTTP_ADDR`: `127.0.0.1:8080`
+
+API responses use JSON envelopes:
+
+```json
+{ "data": {} }
+```
+
+```json
+{ "error": { "code": "not_found", "message": "..." } }
+```
+
+Minimal API endpoints:
+
+```text
+GET  /healthz
+GET  /organizations
+POST /organizations
+GET  /organizations/{id}
+GET  /organizations/{organizationID}/facilities
+POST /organizations/{organizationID}/facilities
+GET  /organizations/{organizationID}/reporting-periods
+POST /organizations/{organizationID}/reporting-periods
+GET  /reporting-periods/{id}
+GET  /reporting-periods/{id}/settings
+PUT  /reporting-periods/{id}/settings
+GET  /reporting-periods/{id}/facilities/{facilityID}/electricity-settings
+PUT  /reporting-periods/{id}/facilities/{facilityID}/electricity-settings
+POST /inputs/parse
+POST /inputs/commit
+POST /reporting-periods/{id}/calculations
+GET  /reporting-periods/{id}/calculation-runs
+GET  /calculation-runs/{id}
+GET  /calculation-runs/{id}/report-tables
+GET  /factor-sets
+GET  /factor-sets/default
+GET  /factor-sets/{id}
+```
+
+Example organization create request:
+
+```sh
+curl -sS -X POST http://127.0.0.1:8080/organizations \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Acme Ltd"}'
+```
+
 Run tests:
 
 ```sh
@@ -132,12 +196,15 @@ Build a local binary:
 
 ```sh
 go build ./cmd/ghgo
+go build ./cmd/ghgo-api
 ```
 
 ## Repository Structure
 
 - `cmd/ghgo`: backend initialization entry point; opens SQLite, runs migrations, and seeds default factors.
+- `cmd/ghgo-api`: HTTP API entry point; opens SQLite, runs migrations, seeds default factors, and serves the API.
 - `internal/app`: API-facing use-case services and backend bootstrap wiring.
+- `internal/httpapi`: standard-library HTTP adapter for `internal/app` services.
 - `internal/ports`: context-aware storage interfaces used by use cases, calculation, input, factors, and reports.
 - `internal/input`: parsers, validators, normalization, hashing, and commit logic for pasted activity data.
 - `internal/calc`: calculation engine that converts active activity records into calculation results.
@@ -158,7 +225,7 @@ go build ./cmd/ghgo
 - Run `go test ./...` after changes that affect parsing, storage, calculation, reporting, or backend helpers.
 - Run `go test -tags ghgo_devtools ./internal/factors` after changing DEFRA import or mapping code.
 - Add schema changes as new files under `migrations`; migrations are embedded through `migrations/embed.go`.
-- Implement API adapters on top of `internal/app` services.
+- Keep HTTP handlers transport-only: decode requests, fill path IDs, call `internal/app`, and encode JSON responses.
 - Add alternate persistence implementations by satisfying `internal/ports.Store`.
 - Implement report generation/export work in or near `internal/report`.
 - Implement graph data and export work near `internal/report`, reusing existing chart dataset tables where practical.

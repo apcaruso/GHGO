@@ -24,7 +24,7 @@ func CommitParsedInput(ctx context.Context, st ports.Store, c CommitContext, par
 		return result, fmt.Errorf("store is required")
 	}
 	if err := validateCommitRequest(c, parsed); err != nil {
-		return result, err
+		return result, fmt.Errorf("%w: %v", ErrInvalidCommit, err)
 	}
 
 	txResult := result
