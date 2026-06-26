@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"ghgo/internal/domain"
-	"ghgo/internal/ports"
+	"ghgo/internal/store"
 	"ghgo/internal/vocab"
 )
 
-func CommitParsedInput(ctx context.Context, st ports.Store, c CommitContext, parsed ParseResult) (CommitResult, error) {
+func CommitParsedInput(ctx context.Context, st *store.Store, c CommitContext, parsed ParseResult) (CommitResult, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -30,8 +30,8 @@ func CommitParsedInput(ctx context.Context, st ports.Store, c CommitContext, par
 	}
 
 	txResult := result
-	if err := st.WithTx(ctx, func(tx ports.Store) error {
-		trustedContext, err := trustedCommitContext(ctx, tx, c)
+	if err := st.WithTx(ctx, func(tx *store.Store) error {
+		trustedContext, err := trustedCommitContext(tx, c)
 		if err != nil {
 			return err
 		}
@@ -40,11 +40,11 @@ func CommitParsedInput(ctx context.Context, st ports.Store, c CommitContext, par
 		}
 
 		c = trustedContext
-		if err := validateStoredSettings(ctx, tx, c); err != nil {
+		if err := validateStoredSettings(tx, c); err != nil {
 			return err
 		}
 		now := time.Now().UTC()
-		if err := supersedeExistingActiveData(ctx, tx, c, parsed.Rows, now); err != nil {
+		if err := supersedeExistingActiveData(tx, c, parsed.Rows, now); err != nil {
 			return err
 		}
 
@@ -65,24 +65,21 @@ func CommitParsedInput(ctx context.Context, st ports.Store, c CommitContext, par
 			ContextJSON:       contextJSON,
 			RawText:           parsed.RawText,
 			RawHash:           RawHash(parsed.RawText),
-			Status:            domain.PasteBatchStatusParsed,
 			RowsTotal:         parsed.RowsTotal,
 			RowsValid:         parsed.RowsValid,
 			RowsError:         parsed.RowsError,
 			CreatedAt:         now,
+			CommittedAt:       &now,
 		}
-		if err := tx.CreatePasteBatch(ctx, batch); err != nil {
+		if err := tx.CreatePasteBatch(batch); err != nil {
 			return err
 		}
 
-		rowActivityIDs, activityRecordIDs, err := createActivityRecords(ctx, tx, c, parsed.Rows, now)
+		rowActivityIDs, activityRecordIDs, err := createActivityRecords(tx, c, parsed.Rows, now)
 		if err != nil {
 			return err
 		}
-		if err := createPasteRows(ctx, tx, batch.ID, parsed.Rows, rowActivityIDs); err != nil {
-			return err
-		}
-		if err := tx.MarkPasteBatchCommitted(ctx, batch.ID, now); err != nil {
+		if err := createPasteRows(tx, batch.ID, parsed.Rows, rowActivityIDs); err != nil {
 			return err
 		}
 
@@ -118,7 +115,7 @@ func trustedParseResult(inputKind vocab.InputKind, parsed ParseResult) ParseResu
 	return normalizeParseResultCounts(Parse(inputKind, parsed.RawText))
 }
 
-func trustedCommitContext(ctx context.Context, st ports.Store, c CommitContext) (CommitContext, error) {
+func trustedCommitContext(st *store.Store, c CommitContext) (CommitContext, error) {
 	if st == nil {
 		return c, invalidCommitf("store is required")
 	}
@@ -132,8 +129,8 @@ func trustedCommitContext(ctx context.Context, st ports.Store, c CommitContext) 
 		return c, invalidCommitf("missing reporting period ID")
 	}
 
-	period, err := st.GetReportingPeriod(ctx, domain.ID(reportingPeriodID))
-	if errors.Is(err, ports.ErrNotFound) {
+	period, err := st.GetReportingPeriod(domain.ID(reportingPeriodID))
+	if errors.Is(err, store.ErrNotFound) {
 		return c, invalidCommitf("reporting period %q was not found", reportingPeriodID)
 	}
 	if err != nil {
@@ -154,7 +151,7 @@ func trustedCommitContext(ctx context.Context, st ports.Store, c CommitContext) 
 		if facilityID == "" {
 			return c, invalidCommitf("facility ID cannot be empty")
 		}
-		if err := validateFacilityBelongsToOrganization(ctx, st, period.OrganizationID, domain.ID(facilityID)); err != nil {
+		if err := validateFacilityBelongsToOrganization(st, period.OrganizationID, domain.ID(facilityID)); err != nil {
 			return c, err
 		}
 		c.FacilityID = &facilityID
@@ -163,8 +160,8 @@ func trustedCommitContext(ctx context.Context, st ports.Store, c CommitContext) 
 	return c, nil
 }
 
-func validateFacilityBelongsToOrganization(ctx context.Context, st ports.Store, organizationID domain.ID, facilityID domain.ID) error {
-	facilities, err := st.ListFacilitiesByOrganization(ctx, organizationID)
+func validateFacilityBelongsToOrganization(st *store.Store, organizationID domain.ID, facilityID domain.ID) error {
+	facilities, err := st.ListFacilitiesByOrganization(organizationID)
 	if err != nil {
 		return err
 	}
@@ -190,14 +187,14 @@ func invalidCommitf(format string, args ...any) error {
 	return invalidCommit(fmt.Errorf(format, args...))
 }
 
-func validateStoredSettings(ctx context.Context, st ports.Store, c CommitContext) error {
+func validateStoredSettings(st *store.Store, c CommitContext) error {
 	expected, ok := expectedMobileMethod(c.InputKind)
 	if !ok {
 		return nil
 	}
 
-	settings, err := st.GetReportingPeriodSettings(ctx, domain.ID(c.ReportingPeriodID))
-	if errors.Is(err, ports.ErrNotFound) {
+	settings, err := st.GetReportingPeriodSettings(domain.ID(c.ReportingPeriodID))
+	if errors.Is(err, store.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -219,7 +216,7 @@ func expectedMobileMethod(inputKind vocab.InputKind) (domain.MobileMethod, bool)
 	return "", false
 }
 
-func supersedeExistingActiveData(ctx context.Context, st ports.Store, c CommitContext, rows []ParsedRow, updatedAt time.Time) error {
+func supersedeExistingActiveData(st *store.Store, c CommitContext, rows []ParsedRow, updatedAt time.Time) error {
 	sourceKind := sourceKindForInput(c.InputKind)
 	switch c.InputKind {
 	case vocab.InputElectricityMonthlyKWh, vocab.InputNaturalGasMonthlySmc:
@@ -230,13 +227,13 @@ func supersedeExistingActiveData(ctx context.Context, st ports.Store, c CommitCo
 				return err
 			}
 			periodStart, _ := monthBounds(c.ReportingYear, month)
-			if err := st.SupersedeActiveActivityRecordsByMonthlyKey(ctx, domain.ID(c.ReportingPeriodID), facilityID, sourceKind, periodStart, updatedAt); err != nil {
+			if err := st.SupersedeActiveActivityRecordsByMonthlyKey(domain.ID(c.ReportingPeriodID), facilityID, sourceKind, periodStart, updatedAt); err != nil {
 				return err
 			}
 		}
 	case vocab.InputMobileFuelLitres, vocab.InputVehicleDistanceKm, vocab.InputRefrigerantsAnnualKg:
 		facilityID := domainIDPtr(c.FacilityID)
-		if err := st.SupersedeActiveActivityRecordsByPeriodFacilitySource(ctx, domain.ID(c.ReportingPeriodID), facilityID, sourceKind, updatedAt); err != nil {
+		if err := st.SupersedeActiveActivityRecordsByPeriodFacilitySource(domain.ID(c.ReportingPeriodID), facilityID, sourceKind, updatedAt); err != nil {
 			return err
 		}
 	}
@@ -269,21 +266,21 @@ func mobileMethodDisplayLabel(method domain.MobileMethod) string {
 	return "the selected method"
 }
 
-func createActivityRecords(ctx context.Context, st ports.Store, c CommitContext, rows []ParsedRow, now time.Time) ([]*domain.ID, []string, error) {
+func createActivityRecords(st *store.Store, c CommitContext, rows []ParsedRow, now time.Time) ([]*domain.ID, []string, error) {
 	switch c.InputKind {
 	case vocab.InputElectricityMonthlyKWh, vocab.InputNaturalGasMonthlySmc:
-		return createMonthlyActivityRecords(ctx, st, c, rows, now)
+		return createMonthlyActivityRecords(st, c, rows, now)
 	case vocab.InputMobileFuelLitres:
-		return createMobileFuelActivityRecords(ctx, st, c, rows, now)
+		return createMobileFuelActivityRecords(st, c, rows, now)
 	case vocab.InputVehicleDistanceKm:
-		return createVehicleDistanceActivityRecords(ctx, st, c, rows, now)
+		return createVehicleDistanceActivityRecords(st, c, rows, now)
 	case vocab.InputRefrigerantsAnnualKg:
-		return createRefrigerantActivityRecords(ctx, st, c, rows, now)
+		return createRefrigerantActivityRecords(st, c, rows, now)
 	}
 	return nil, nil, fmt.Errorf("unsupported input kind %q", c.InputKind)
 }
 
-func createMonthlyActivityRecords(ctx context.Context, st ports.Store, c CommitContext, rows []ParsedRow, now time.Time) ([]*domain.ID, []string, error) {
+func createMonthlyActivityRecords(st *store.Store, c CommitContext, rows []ParsedRow, now time.Time) ([]*domain.ID, []string, error) {
 	rowActivityIDs := make([]*domain.ID, len(rows))
 	activityRecordIDs := make([]string, 0, len(rows))
 	sourceKind := sourceKindForInput(c.InputKind)
@@ -334,7 +331,7 @@ func createMonthlyActivityRecords(ctx context.Context, st ports.Store, c CommitC
 		}
 		record.SourceHash = SourceHash(record)
 
-		if err := st.CreateActivityRecord(ctx, record); err != nil {
+		if err := st.CreateActivityRecord(record); err != nil {
 			return nil, nil, err
 		}
 		rowActivityIDs[i] = idPtr(record.ID)
@@ -349,7 +346,7 @@ type aggregateRows struct {
 	rows   []int
 }
 
-func createMobileFuelActivityRecords(ctx context.Context, st ports.Store, c CommitContext, rows []ParsedRow, now time.Time) ([]*domain.ID, []string, error) {
+func createMobileFuelActivityRecords(st *store.Store, c CommitContext, rows []ParsedRow, now time.Time) ([]*domain.ID, []string, error) {
 	rowActivityIDs := make([]*domain.ID, len(rows))
 	aggregates := make(map[string]*aggregateRows)
 	var order []string
@@ -397,7 +394,7 @@ func createMobileFuelActivityRecords(ctx context.Context, st ports.Store, c Comm
 		}
 		record.SourceHash = SourceHash(record)
 
-		if err := st.CreateActivityRecord(ctx, record); err != nil {
+		if err := st.CreateActivityRecord(record); err != nil {
 			return nil, nil, err
 		}
 		for _, rowIndex := range aggregate.rows {
@@ -409,7 +406,7 @@ func createMobileFuelActivityRecords(ctx context.Context, st ports.Store, c Comm
 	return rowActivityIDs, activityRecordIDs, nil
 }
 
-func createVehicleDistanceActivityRecords(ctx context.Context, st ports.Store, c CommitContext, rows []ParsedRow, now time.Time) ([]*domain.ID, []string, error) {
+func createVehicleDistanceActivityRecords(st *store.Store, c CommitContext, rows []ParsedRow, now time.Time) ([]*domain.ID, []string, error) {
 	rowActivityIDs := make([]*domain.ID, len(rows))
 	activityRecordIDs := make([]string, 0, len(rows))
 
@@ -448,7 +445,7 @@ func createVehicleDistanceActivityRecords(ctx context.Context, st ports.Store, c
 		}
 		record.SourceHash = SourceHash(record)
 
-		if err := st.CreateActivityRecord(ctx, record); err != nil {
+		if err := st.CreateActivityRecord(record); err != nil {
 			return nil, nil, err
 		}
 		rowActivityIDs[i] = idPtr(record.ID)
@@ -458,7 +455,7 @@ func createVehicleDistanceActivityRecords(ctx context.Context, st ports.Store, c
 	return rowActivityIDs, activityRecordIDs, nil
 }
 
-func createRefrigerantActivityRecords(ctx context.Context, st ports.Store, c CommitContext, rows []ParsedRow, now time.Time) ([]*domain.ID, []string, error) {
+func createRefrigerantActivityRecords(st *store.Store, c CommitContext, rows []ParsedRow, now time.Time) ([]*domain.ID, []string, error) {
 	rowActivityIDs := make([]*domain.ID, len(rows))
 	aggregates := make(map[string]*aggregateRows)
 	var order []string
@@ -506,7 +503,7 @@ func createRefrigerantActivityRecords(ctx context.Context, st ports.Store, c Com
 		}
 		record.SourceHash = SourceHash(record)
 
-		if err := st.CreateActivityRecord(ctx, record); err != nil {
+		if err := st.CreateActivityRecord(record); err != nil {
 			return nil, nil, err
 		}
 		for _, rowIndex := range aggregate.rows {
@@ -518,7 +515,7 @@ func createRefrigerantActivityRecords(ctx context.Context, st ports.Store, c Com
 	return rowActivityIDs, activityRecordIDs, nil
 }
 
-func createPasteRows(ctx context.Context, st ports.Store, pasteBatchID domain.ID, rows []ParsedRow, rowActivityIDs []*domain.ID) error {
+func createPasteRows(st *store.Store, pasteBatchID domain.ID, rows []ParsedRow, rowActivityIDs []*domain.ID) error {
 	for i, parsedRow := range rows {
 		pasteRowID, err := newID("paste_row")
 		if err != nil {
@@ -547,12 +544,11 @@ func createPasteRows(ctx context.Context, st ports.Store, pasteBatchID domain.ID
 			RowNumber:        parsedRow.RowNumber,
 			RawJSON:          rawJSON,
 			NormalizedJSON:   normalizedJSON,
-			Status:           domain.PasteRowStatusCommitted,
 			ErrorsJSON:       errorsJSON,
 			WarningsJSON:     warningsJSON,
 			ActivityRecordID: rowActivityIDs[i],
 		}
-		if err := st.CreatePasteRow(ctx, row); err != nil {
+		if err := st.CreatePasteRow(row); err != nil {
 			return err
 		}
 	}

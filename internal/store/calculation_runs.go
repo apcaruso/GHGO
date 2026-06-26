@@ -11,13 +11,12 @@ import (
 
 func (s *Store) CreateCalculationRun(run domain.CalculationRun) error {
 	_, err := s.exec(
-		`INSERT INTO calculation_runs (id, organization_id, reporting_period_id, factor_set_id, status, started_at, completed_at, settings_snapshot_json)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO calculation_runs (id, organization_id, reporting_period_id, factor_set_id, started_at, completed_at, settings_snapshot_json)
+VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		run.ID,
 		run.OrganizationID,
 		run.ReportingPeriodID,
 		run.FactorSetID,
-		string(run.Status),
 		formatTime(run.StartedAt),
 		nullTime(run.CompletedAt),
 		run.SettingsSnapshotJSON,
@@ -30,8 +29,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 
 func (s *Store) CompleteCalculationRun(id domain.ID, completedAt time.Time) error {
 	result, err := s.exec(
-		`UPDATE calculation_runs SET status = ?, completed_at = ? WHERE id = ?`,
-		string(domain.CalculationRunStatusCompleted),
+		`UPDATE calculation_runs SET completed_at = ? WHERE id = ?`,
 		formatTime(completedAt),
 		id,
 	)
@@ -52,7 +50,7 @@ func (s *Store) CompleteCalculationRun(id domain.ID, completedAt time.Time) erro
 
 func (s *Store) GetCalculationRun(id domain.ID) (*domain.CalculationRun, error) {
 	run, err := scanCalculationRun(s.queryRow(
-		`SELECT id, organization_id, reporting_period_id, factor_set_id, status, started_at, completed_at, settings_snapshot_json
+		`SELECT id, organization_id, reporting_period_id, factor_set_id, started_at, completed_at, settings_snapshot_json
 FROM calculation_runs WHERE id = ?`,
 		id,
 	))
@@ -67,7 +65,7 @@ FROM calculation_runs WHERE id = ?`,
 
 func (s *Store) ListCalculationRunsByPeriod(reportingPeriodID domain.ID) ([]domain.CalculationRun, error) {
 	rows, err := s.query(
-		`SELECT id, organization_id, reporting_period_id, factor_set_id, status, started_at, completed_at, settings_snapshot_json
+		`SELECT id, organization_id, reporting_period_id, factor_set_id, started_at, completed_at, settings_snapshot_json
 FROM calculation_runs WHERE reporting_period_id = ? ORDER BY started_at, id`,
 		reportingPeriodID,
 	)
@@ -93,7 +91,6 @@ FROM calculation_runs WHERE reporting_period_id = ? ORDER BY started_at, id`,
 
 func scanCalculationRun(row scanner) (*domain.CalculationRun, error) {
 	var run domain.CalculationRun
-	var status string
 	var startedAt string
 	var completedAt sql.NullString
 	if err := row.Scan(
@@ -101,7 +98,6 @@ func scanCalculationRun(row scanner) (*domain.CalculationRun, error) {
 		&run.OrganizationID,
 		&run.ReportingPeriodID,
 		&run.FactorSetID,
-		&status,
 		&startedAt,
 		&completedAt,
 		&run.SettingsSnapshotJSON,
@@ -113,7 +109,6 @@ func scanCalculationRun(row scanner) (*domain.CalculationRun, error) {
 	}
 
 	var err error
-	run.Status = domain.CalculationRunStatus(status)
 	run.StartedAt, err = parseTime(startedAt)
 	if err != nil {
 		return nil, err

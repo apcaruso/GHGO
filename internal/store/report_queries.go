@@ -6,10 +6,12 @@ import (
 	"fmt"
 
 	"ghgo/internal/domain"
-	"ghgo/internal/ports"
 )
 
-type ReportResultRow = ports.ReportResultRow
+type ReportResultRow struct {
+	CalculationResult domain.CalculationResult
+	ActivityRecord    domain.ActivityRecord
+}
 
 func (s *Store) ListReportResultRows(ctx context.Context, calculationRunID domain.ID) ([]ReportResultRow, error) {
 	rows, err := s.queryContext(ctx, `SELECT

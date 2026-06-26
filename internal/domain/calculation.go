@@ -2,28 +2,11 @@ package domain
 
 import "time"
 
-type CalculationRunStatus string
-
-const (
-	CalculationRunStatusRunning   CalculationRunStatus = "running"
-	CalculationRunStatusCompleted CalculationRunStatus = "completed"
-	CalculationRunStatusFailed    CalculationRunStatus = "failed"
-)
-
-func (s CalculationRunStatus) Valid() bool {
-	switch s {
-	case CalculationRunStatusRunning, CalculationRunStatusCompleted, CalculationRunStatusFailed:
-		return true
-	}
-	return false
-}
-
 type CalculationRun struct {
 	ID                   ID
 	OrganizationID       ID
 	ReportingPeriodID    ID
 	FactorSetID          ID
-	Status               CalculationRunStatus
 	StartedAt            time.Time
 	CompletedAt          *time.Time
 	SettingsSnapshotJSON string

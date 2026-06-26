@@ -53,22 +53,6 @@ func TestEnumValidation(t *testing.T) {
 		{"activity status superseded", ActivityRecordStatusSuperseded, true},
 		{"activity status deleted", ActivityRecordStatusDeleted, true},
 		{"activity status invalid", ActivityRecordStatus("draft"), false},
-
-		{"calculation status running", CalculationRunStatusRunning, true},
-		{"calculation status completed", CalculationRunStatusCompleted, true},
-		{"calculation status failed", CalculationRunStatusFailed, true},
-		{"calculation status invalid", CalculationRunStatus("cancelled"), false},
-
-		{"paste batch status parsed", PasteBatchStatusParsed, true},
-		{"paste batch status committed", PasteBatchStatusCommitted, true},
-		{"paste batch status failed", PasteBatchStatusFailed, true},
-		{"paste batch status invalid", PasteBatchStatus("draft"), false},
-
-		{"paste row status valid", PasteRowStatusValid, true},
-		{"paste row status warning", PasteRowStatusWarning, true},
-		{"paste row status error", PasteRowStatusError, true},
-		{"paste row status committed", PasteRowStatusCommitted, true},
-		{"paste row status invalid", PasteRowStatus("skipped"), false},
 	}
 
 	for _, tt := range tests {

@@ -2,7 +2,7 @@ package report
 
 import (
 	"ghgo/internal/domain"
-	"ghgo/internal/ports"
+	"ghgo/internal/store"
 )
 
 type ExecutiveSummaryTable struct {
@@ -173,7 +173,7 @@ type vectorActivityAmounts struct {
 	mobileUnit  string
 }
 
-func vectorAmounts(rows []ports.ReportResultRow) vectorActivityAmounts {
+func vectorAmounts(rows []store.ReportResultRow) vectorActivityAmounts {
 	amounts := vectorActivityAmounts{seen: map[string]bool{}}
 	for _, row := range rows {
 		record := row.ActivityRecord

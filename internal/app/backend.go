@@ -7,13 +7,12 @@ import (
 
 	"ghgo/internal/domain"
 	"ghgo/internal/factors"
-	"ghgo/internal/ports"
 	"ghgo/internal/store"
 )
 
 type Backend struct {
 	DB               *sql.DB
-	Store            ports.Store
+	Store            *store.Store
 	Services         *Services
 	DefaultFactorSet *domain.FactorSet
 }
@@ -43,13 +42,12 @@ func OpenSQLite(ctx context.Context, dbPath string) (*Backend, error) {
 	}
 
 	st := store.New(db)
-	repo := store.NewRepository(st)
-	defaultFactorSet, err := factors.EnsureDefaultFactors(ctx, repo)
+	defaultFactorSet, err := factors.EnsureDefaultFactors(ctx, st)
 	if err != nil {
 		return nil, fmt.Errorf("seed default factors: %w", err)
 	}
 
-	services, err := NewServices(repo)
+	services, err := NewServices(st)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +55,7 @@ func OpenSQLite(ctx context.Context, dbPath string) (*Backend, error) {
 	closeOnError = false
 	return &Backend{
 		DB:               db,
-		Store:            repo,
+		Store:            st,
 		Services:         services,
 		DefaultFactorSet: defaultFactorSet,
 	}, nil

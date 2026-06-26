@@ -8,7 +8,6 @@ import (
 	"ghgo/internal/calc"
 	"ghgo/internal/domain"
 	"ghgo/internal/input"
-	"ghgo/internal/report"
 	"ghgo/internal/vocab"
 )
 
@@ -255,21 +254,6 @@ func newParseResultPayload(result input.ParseResult) parseResultPayload {
 	}
 }
 
-func (p parseResultPayload) toInput() input.ParseResult {
-	rows := make([]input.ParsedRow, 0, len(p.Rows))
-	for _, row := range p.Rows {
-		rows = append(rows, row.toInput())
-	}
-	return input.ParseResult{
-		InputKind: p.InputKind,
-		RawText:   p.RawText,
-		Rows:      rows,
-		RowsTotal: p.RowsTotal,
-		RowsValid: p.RowsValid,
-		RowsError: p.RowsError,
-	}
-}
-
 type parsedRowPayload struct {
 	RowNumber  int                 `json:"row_number"`
 	RawFields  []string            `json:"raw_fields"`
@@ -300,28 +284,6 @@ func newParsedRowPayload(row input.ParsedRow) parsedRowPayload {
 	}
 }
 
-func (p parsedRowPayload) toInput() input.ParsedRow {
-	errors := make([]input.ParseIssue, 0, len(p.Errors))
-	for _, issue := range p.Errors {
-		errors = append(errors, issue.toInput())
-	}
-	warnings := make([]input.ParseIssue, 0, len(p.Warnings))
-	for _, issue := range p.Warnings {
-		warnings = append(warnings, issue.toInput())
-	}
-	normalized := map[string]string{}
-	for key, value := range p.Normalized {
-		normalized[key] = value
-	}
-	return input.ParsedRow{
-		RowNumber:  p.RowNumber,
-		RawFields:  append([]string(nil), p.RawFields...),
-		Normalized: normalized,
-		Errors:     errors,
-		Warnings:   warnings,
-	}
-}
-
 type parseIssuePayload struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
@@ -329,10 +291,6 @@ type parseIssuePayload struct {
 
 func newParseIssuePayload(issue input.ParseIssue) parseIssuePayload {
 	return parseIssuePayload{Code: issue.Code, Message: issue.Message}
-}
-
-func (p parseIssuePayload) toInput() input.ParseIssue {
-	return input.ParseIssue{Code: p.Code, Message: p.Message}
 }
 
 type commitResultResponse struct {
@@ -381,7 +339,6 @@ type calculationRunResponse struct {
 	OrganizationID       string  `json:"organization_id"`
 	ReportingPeriodID    string  `json:"reporting_period_id"`
 	FactorSetID          string  `json:"factor_set_id"`
-	Status               string  `json:"status"`
 	StartedAt            string  `json:"started_at"`
 	CompletedAt          *string `json:"completed_at"`
 	SettingsSnapshotJSON string  `json:"settings_snapshot_json"`
@@ -396,7 +353,6 @@ func newCalculationRunResponse(run *domain.CalculationRun) calculationRunRespons
 		OrganizationID:       run.OrganizationID,
 		ReportingPeriodID:    run.ReportingPeriodID,
 		FactorSetID:          run.FactorSetID,
-		Status:               string(run.Status),
 		StartedAt:            formatTime(run.StartedAt),
 		CompletedAt:          formatTimePtr(run.CompletedAt),
 		SettingsSnapshotJSON: run.SettingsSnapshotJSON,
@@ -442,75 +398,6 @@ func newFactorSetResponses(factorSets []domain.FactorSet) []factorSetResponse {
 		responses = append(responses, newFactorSetResponse(&factorSets[i]))
 	}
 	return responses
-}
-
-type reportTablesResponse struct {
-	CalculationRunID   string                         `json:"calculation_run_id"`
-	OrganizationID     string                         `json:"organization_id"`
-	ReportingPeriodID  string                         `json:"reporting_period_id"`
-	FactorSetID        string                         `json:"factor_set_id"`
-	ExecutiveSummary   executiveSummaryResponse       `json:"executive_summary"`
-	MonthlyEmissions   report.MonthlyEmissionsTable   `json:"monthly_emissions"`
-	ElectricityDetail  report.ElectricityDetailTable  `json:"electricity_detail"`
-	NaturalGasDetail   report.NaturalGasDetailTable   `json:"natural_gas_detail"`
-	MobileDetail       report.MobileDetailTable       `json:"mobile_detail"`
-	RefrigerantsDetail report.RefrigerantsDetailTable `json:"refrigerants_detail"`
-	ScopeSummary       report.ScopeSummaryTable       `json:"scope_summary"`
-	VectorSummary      report.VectorSummaryTable      `json:"vector_summary"`
-	Methodology        report.MethodologyTable        `json:"methodology"`
-	ValidationNotes    report.ValidationNotesTable    `json:"validation_notes"`
-}
-
-type executiveSummaryResponse struct {
-	ReportingPeriodID          string   `json:"reporting_period_id"`
-	FactorSetID                string   `json:"factor_set_id"`
-	PrimaryTotalKgCO2e         float64  `json:"primary_total_kg_co2e"`
-	PrimaryTotalTCO2e          float64  `json:"primary_total_t_co2e"`
-	LocationBasedTotalKgCO2e   *float64 `json:"location_based_total_kg_co2e"`
-	LocationBasedTotalTCO2e    *float64 `json:"location_based_total_t_co2e"`
-	ElectricityPrimaryMethod   string   `json:"electricity_primary_method"`
-	HasLocationBasedComparison bool     `json:"has_location_based_comparison"`
-	Scope1PrimaryKgCO2e        float64  `json:"scope1_primary_kg_co2e"`
-	Scope2PrimaryKgCO2e        float64  `json:"scope2_primary_kg_co2e"`
-	Scope2LocationBasedKgCO2e  *float64 `json:"scope2_location_based_kg_co2e"`
-}
-
-func newReportTablesResponse(tables *report.ReportTables) reportTablesResponse {
-	if tables == nil {
-		return reportTablesResponse{}
-	}
-	return reportTablesResponse{
-		CalculationRunID:   tables.CalculationRunID,
-		OrganizationID:     tables.OrganizationID,
-		ReportingPeriodID:  tables.ReportingPeriodID,
-		FactorSetID:        tables.FactorSetID,
-		ExecutiveSummary:   newExecutiveSummaryResponse(tables.ExecutiveSummary),
-		MonthlyEmissions:   tables.MonthlyEmissions,
-		ElectricityDetail:  tables.ElectricityDetail,
-		NaturalGasDetail:   tables.NaturalGasDetail,
-		MobileDetail:       tables.MobileDetail,
-		RefrigerantsDetail: tables.RefrigerantsDetail,
-		ScopeSummary:       tables.ScopeSummary,
-		VectorSummary:      tables.VectorSummary,
-		Methodology:        tables.Methodology,
-		ValidationNotes:    tables.ValidationNotes,
-	}
-}
-
-func newExecutiveSummaryResponse(summary report.ExecutiveSummaryTable) executiveSummaryResponse {
-	return executiveSummaryResponse{
-		ReportingPeriodID:          summary.ReportingPeriodID,
-		FactorSetID:                summary.FactorSetID,
-		PrimaryTotalKgCO2e:         summary.PrimaryTotalKgCO2e,
-		PrimaryTotalTCO2e:          summary.PrimaryTotalTCO2e,
-		LocationBasedTotalKgCO2e:   summary.LocationBasedTotalKgCO2e,
-		LocationBasedTotalTCO2e:    summary.LocationBasedTotalTCO2e,
-		ElectricityPrimaryMethod:   summary.ElectricityPrimaryMethod,
-		HasLocationBasedComparison: summary.HasLocationBasedComparison,
-		Scope1PrimaryKgCO2e:        summary.Scope1PrimaryKgCO2e,
-		Scope2PrimaryKgCO2e:        summary.Scope2PrimaryKgCO2e,
-		Scope2LocationBasedKgCO2e:  summary.Scope2LocationBasedKgCO2e,
-	}
 }
 
 func parseOptionalTime(value string, field string) (time.Time, error) {

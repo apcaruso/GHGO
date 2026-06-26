@@ -7,7 +7,6 @@ import (
 
 var (
 	ErrInvalidOptions     = errors.New("invalid report options")
-	ErrRunNotCompleted    = errors.New("calculation run is not completed")
 	ErrMixedMobileMethods = errors.New("mixed mobile methods")
 )
 

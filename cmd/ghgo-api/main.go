@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"ghgo/internal/app"
@@ -36,7 +37,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           httpapi.New(backend.Services),
+		Handler:           newHandler(httpapi.New(backend.Services)),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -45,4 +46,47 @@ func main() {
 		fmt.Fprintf(os.Stderr, "ghgo-api: serve: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func newHandler(api http.Handler) http.Handler {
+	uiDir := uiDirectory()
+	if uiDir == "" {
+		return api
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/ui/", http.StripPrefix("/ui/", http.FileServer(http.Dir(uiDir))))
+	mux.HandleFunc("GET /ui", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/ui/", http.StatusMovedPermanently)
+	})
+	mux.Handle("/", api)
+	return mux
+}
+
+func uiDirectory() string {
+	if dir := usableDirectory(os.Getenv("GHGO_UI_DIR")); dir != "" {
+		return dir
+	}
+
+	for _, candidate := range []string{"../frontend", "frontend"} {
+		if dir := usableDirectory(candidate); dir != "" {
+			return dir
+		}
+	}
+	return ""
+}
+
+func usableDirectory(path string) string {
+	if path == "" {
+		return ""
+	}
+	info, err := os.Stat(path)
+	if err != nil || !info.IsDir() {
+		return ""
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return path
+	}
+	return abs
 }

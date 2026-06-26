@@ -10,15 +10,14 @@ import (
 func (s *Store) CreatePasteRow(row domain.PasteRow) error {
 	_, err := s.exec(
 		`INSERT INTO paste_rows (
-  id, paste_batch_id, row_number, raw_json, normalized_json, status,
+  id, paste_batch_id, row_number, raw_json, normalized_json,
   errors_json, warnings_json, activity_record_id
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		row.ID,
 		row.PasteBatchID,
 		row.RowNumber,
 		row.RawJSON,
 		row.NormalizedJSON,
-		string(row.Status),
 		row.ErrorsJSON,
 		row.WarningsJSON,
 		nullStringPtr(row.ActivityRecordID),
@@ -31,7 +30,7 @@ func (s *Store) CreatePasteRow(row domain.PasteRow) error {
 
 func (s *Store) ListPasteRowsByBatch(pasteBatchID domain.ID) ([]domain.PasteRow, error) {
 	rows, err := s.query(
-		`SELECT id, paste_batch_id, row_number, raw_json, normalized_json, status, errors_json, warnings_json, activity_record_id
+		`SELECT id, paste_batch_id, row_number, raw_json, normalized_json, errors_json, warnings_json, activity_record_id
 FROM paste_rows WHERE paste_batch_id = ? ORDER BY row_number, id`,
 		pasteBatchID,
 	)
@@ -57,7 +56,6 @@ FROM paste_rows WHERE paste_batch_id = ? ORDER BY row_number, id`,
 
 func scanPasteRow(row scanner) (*domain.PasteRow, error) {
 	var pasteRow domain.PasteRow
-	var status string
 	var activityRecordID sql.NullString
 	if err := row.Scan(
 		&pasteRow.ID,
@@ -65,7 +63,6 @@ func scanPasteRow(row scanner) (*domain.PasteRow, error) {
 		&pasteRow.RowNumber,
 		&pasteRow.RawJSON,
 		&pasteRow.NormalizedJSON,
-		&status,
 		&pasteRow.ErrorsJSON,
 		&pasteRow.WarningsJSON,
 		&activityRecordID,
@@ -73,8 +70,6 @@ func scanPasteRow(row scanner) (*domain.PasteRow, error) {
 		return nil, err
 	}
 
-	pasteRow.Status = domain.PasteRowStatus(status)
 	pasteRow.ActivityRecordID = stringPtrFromNull(activityRecordID)
-
 	return &pasteRow, nil
 }

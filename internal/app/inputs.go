@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"ghgo/internal/input"
-	"ghgo/internal/ports"
+	"ghgo/internal/store"
 	"ghgo/internal/vocab"
 )
 
 type InputService struct {
-	store ports.Store
+	store *store.Store
 }
 
 type ParseInputOptions struct {

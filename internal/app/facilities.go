@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"ghgo/internal/domain"
-	"ghgo/internal/ports"
+	"ghgo/internal/store"
 )
 
 type FacilityService struct {
-	store ports.Store
+	store *store.Store
 }
 
 type CreateFacilityOptions struct {
@@ -28,7 +28,7 @@ func (s *FacilityService) Create(ctx context.Context, opts CreateFacilityOptions
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.store.GetOrganization(ctx, organizationID); err != nil {
+	if _, err := s.store.GetOrganization(organizationID); err != nil {
 		return nil, err
 	}
 
@@ -58,7 +58,7 @@ func (s *FacilityService) Create(ctx context.Context, opts CreateFacilityOptions
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	if err := s.store.CreateFacility(ctx, facility); err != nil {
+	if err := s.store.CreateFacility(facility); err != nil {
 		return nil, err
 	}
 	return &facility, nil
@@ -72,5 +72,5 @@ func (s *FacilityService) ListByOrganization(ctx context.Context, organizationID
 	if err != nil {
 		return nil, err
 	}
-	return s.store.ListFacilitiesByOrganization(ctx, id)
+	return s.store.ListFacilitiesByOrganization(id)
 }

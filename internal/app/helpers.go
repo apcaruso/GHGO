@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"ghgo/internal/domain"
-	"ghgo/internal/ports"
+	"ghgo/internal/store"
 )
 
-func checkStore(ctx context.Context, st ports.Store) error {
+func checkStore(ctx context.Context, st *store.Store) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}

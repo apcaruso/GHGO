@@ -1,5 +1,5 @@
 package store
 
-import "ghgo/internal/ports"
+import "errors"
 
-var ErrNotFound = ports.ErrNotFound
+var ErrNotFound = errors.New("not found")

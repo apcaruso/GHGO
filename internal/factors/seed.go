@@ -13,7 +13,7 @@ import (
 
 	"ghgo/factorpacks"
 	"ghgo/internal/domain"
-	"ghgo/internal/ports"
+	"ghgo/internal/store"
 )
 
 const defaultFactorPackPath = "defra-2025/factor-pack.json"
@@ -73,7 +73,7 @@ func LoadFactorPack(fsys fs.FS, path string) (*FactorPack, error) {
 	return &pack, nil
 }
 
-func EnsureDefaultFactors(ctx context.Context, st ports.Store) (*domain.FactorSet, error) {
+func EnsureDefaultFactors(ctx context.Context, st *store.Store) (*domain.FactorSet, error) {
 	pack, err := LoadFactorPack(factorpacks.FS, defaultFactorPackPath)
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func EnsureDefaultFactors(ctx context.Context, st ports.Store) (*domain.FactorSe
 	return EnsureFactorPack(ctx, st, *pack)
 }
 
-func EnsureFactorPack(ctx context.Context, st ports.Store, pack FactorPack) (*domain.FactorSet, error) {
+func EnsureFactorPack(ctx context.Context, st *store.Store, pack FactorPack) (*domain.FactorSet, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -94,9 +94,9 @@ func EnsureFactorPack(ctx context.Context, st ports.Store, pack FactorPack) (*do
 	}
 
 	var factorSet *domain.FactorSet
-	if err := st.WithTx(ctx, func(tx ports.Store) error {
-		set, err := tx.FindFactorSetBySourceYearVersion(ctx, pack.Source, pack.Year, pack.Version)
-		if errors.Is(err, ports.ErrNotFound) {
+	if err := st.WithTx(ctx, func(tx *store.Store) error {
+		set, err := tx.FindFactorSetBySourceYearVersion(pack.Source, pack.Year, pack.Version)
+		if errors.Is(err, store.ErrNotFound) {
 			metadataJSON, err := compactMetadata(pack.Metadata)
 			if err != nil {
 				return err
@@ -110,7 +110,7 @@ func EnsureFactorPack(ctx context.Context, st ports.Store, pack FactorPack) (*do
 				ImportedAt:   time.Now().UTC(),
 				MetadataJSON: metadataJSON,
 			}
-			if err := tx.CreateFactorSet(ctx, *set); err != nil {
+			if err := tx.CreateFactorSet(*set); err != nil {
 				return err
 			}
 		} else if err != nil {
@@ -133,7 +133,7 @@ func EnsureFactorPack(ctx context.Context, st ports.Store, pack FactorPack) (*do
 			if err != nil {
 				return err
 			}
-			if err := tx.CreateEmissionFactor(ctx, factor); err != nil {
+			if err := tx.CreateEmissionFactor(factor); err != nil {
 				return err
 			}
 		}
@@ -253,7 +253,7 @@ func (p FactorPack) factorSetName() string {
 	return strings.TrimSpace(fmt.Sprintf("%s %d", p.Source, p.Year))
 }
 
-func (r FactorPackRow) query(factorSetID domain.ID) ports.EmissionFactorQuery {
+func (r FactorPackRow) query(factorSetID domain.ID) store.EmissionFactorQuery {
 	scope := r.Scope
 	activityType := r.ActivityType
 	fuelType := r.FuelType
@@ -263,7 +263,7 @@ func (r FactorPackRow) query(factorSetID domain.ID) ports.EmissionFactorQuery {
 	inputUnit := r.InputUnit
 	factorUnit := r.FactorUnit
 	ghg := r.GHG
-	return ports.EmissionFactorQuery{
+	return store.EmissionFactorQuery{
 		FactorSetID:      factorSetID,
 		Scope:            &scope,
 		ActivityType:     &activityType,

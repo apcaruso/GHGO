@@ -3,12 +3,12 @@ package app
 import (
 	"context"
 
-	"ghgo/internal/ports"
 	"ghgo/internal/report"
+	"ghgo/internal/store"
 )
 
 type ReportService struct {
-	store ports.Store
+	store *store.Store
 }
 
 type BuildReportTablesOptions struct {

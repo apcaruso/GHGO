@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"ghgo/factorpacks"
-	"ghgo/internal/store"
 	"ghgo/internal/vocab"
 )
 
@@ -34,8 +33,7 @@ func TestDefaultFactorPackIsVersionedData(t *testing.T) {
 func TestEnsureDefaultFactorsFreshDatabaseIsIdempotent(t *testing.T) {
 	st := newTestStore(t)
 
-	repo := store.NewRepository(st)
-	factorSet, err := EnsureDefaultFactors(context.Background(), repo)
+	factorSet, err := EnsureDefaultFactors(context.Background(), st)
 	if err != nil {
 		t.Fatalf("ensure default factors: %v", err)
 	}
@@ -50,7 +48,7 @@ func TestEnsureDefaultFactorsFreshDatabaseIsIdempotent(t *testing.T) {
 		t.Fatalf("factor count = 0, want seeded factors")
 	}
 
-	second, err := EnsureDefaultFactors(context.Background(), repo)
+	second, err := EnsureDefaultFactors(context.Background(), st)
 	if err != nil {
 		t.Fatalf("ensure default factors second call: %v", err)
 	}
@@ -68,12 +66,11 @@ func TestEnsureDefaultFactorsFreshDatabaseIsIdempotent(t *testing.T) {
 
 func TestEnsureDefaultFactorsSupportsLookups(t *testing.T) {
 	st := newTestStore(t)
-	repo := store.NewRepository(st)
-	factorSet, err := EnsureDefaultFactors(context.Background(), repo)
+	factorSet, err := EnsureDefaultFactors(context.Background(), st)
 	if err != nil {
 		t.Fatalf("ensure default factors: %v", err)
 	}
-	lookup := NewLookup(repo, factorSet.ID)
+	lookup := NewLookup(st, factorSet.ID)
 
 	if _, err := lookup.FindElectricityLocationFactor(context.Background()); err != nil {
 		t.Fatalf("lookup electricity: %v", err)

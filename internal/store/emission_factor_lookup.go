@@ -7,10 +7,21 @@ import (
 	"strings"
 
 	"ghgo/internal/domain"
-	"ghgo/internal/ports"
 )
 
-type EmissionFactorQuery = ports.EmissionFactorQuery
+type EmissionFactorQuery struct {
+	FactorSetID string
+
+	Scope            *int
+	ActivityType     *string
+	FuelType         *string
+	VehicleType      *string
+	VehicleSizeClass *string
+	Substance        *string
+	InputUnit        *string
+	FactorUnit       *string
+	GHG              *string
+}
 
 func (s *Store) FindEmissionFactors(ctx context.Context, q EmissionFactorQuery) ([]domain.EmissionFactor, error) {
 	if q.FactorSetID == "" {

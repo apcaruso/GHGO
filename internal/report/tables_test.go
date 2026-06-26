@@ -15,20 +15,8 @@ import (
 	"ghgo/internal/vocab"
 )
 
-func TestBuildRequiresCompletedRun(t *testing.T) {
-	f := newReportFixture(t, domain.CalculationRunStatusRunning)
-
-	_, err := f.builder.BuildTables(context.Background(), BuildOptions{CalculationRunID: f.runID})
-	if err == nil {
-		t.Fatalf("BuildTables error = nil, want error")
-	}
-	if !errors.Is(err, ErrRunNotCompleted) {
-		t.Fatalf("BuildTables error = %v, want ErrRunNotCompleted", err)
-	}
-}
-
 func TestElectricityWithoutGO(t *testing.T) {
-	f := newReportFixture(t, domain.CalculationRunStatusCompleted)
+	f := newReportFixture(t)
 	record := f.addElectricityRecord(t, "electricity-jan", 1, 1000)
 	f.addResult(t, "result-electricity-location", record, domain.ActivityMethodLocationBased, 0.3, "kgCO2e/kWh", "test source", 300, true)
 
@@ -58,7 +46,7 @@ func TestElectricityWithoutGO(t *testing.T) {
 }
 
 func TestElectricityWithGO(t *testing.T) {
-	f := newReportFixture(t, domain.CalculationRunStatusCompleted)
+	f := newReportFixture(t)
 	record := f.addElectricityRecord(t, "electricity-jan", 1, 1000)
 	f.addResult(t, "result-electricity-location", record, domain.ActivityMethodLocationBased, 0.3, "kgCO2e/kWh", "test source", 300, false)
 	f.addResult(t, "result-electricity-market", record, domain.ActivityMethodMarketBased, 0, "kgCO2e/kWh", "Guarantees of Origin", 0, true)
@@ -94,7 +82,7 @@ func TestElectricityWithGO(t *testing.T) {
 }
 
 func TestMonthlyTable(t *testing.T) {
-	f := newReportFixture(t, domain.CalculationRunStatusCompleted)
+	f := newReportFixture(t)
 	electricity := f.addElectricityRecord(t, "electricity-jan", 1, 1000)
 	f.addResult(t, "result-electricity-location", electricity, domain.ActivityMethodLocationBased, 0.3, "kgCO2e/kWh", "test source", 300, false)
 	f.addResult(t, "result-electricity-market", electricity, domain.ActivityMethodMarketBased, 0, "kgCO2e/kWh", "Guarantees of Origin", 0, true)
@@ -120,7 +108,7 @@ func TestMonthlyTable(t *testing.T) {
 }
 
 func TestNaturalGasDetail(t *testing.T) {
-	f := newReportFixture(t, domain.CalculationRunStatusCompleted)
+	f := newReportFixture(t)
 	record := f.addNaturalGasRecord(t, "natural-gas-jan", 1, 100)
 	f.addResult(t, "result-natural-gas", record, domain.ActivityMethodFuelBased, 2, "kgCO2e/Smc", "test source", 200, true)
 
@@ -137,7 +125,7 @@ func TestNaturalGasDetail(t *testing.T) {
 }
 
 func TestMobileFuelDetail(t *testing.T) {
-	f := newReportFixture(t, domain.CalculationRunStatusCompleted)
+	f := newReportFixture(t)
 	record := f.addMobileFuelRecord(t, "mobile-fuel", 100)
 	f.addResult(t, "result-mobile-fuel", record, domain.ActivityMethodFuelBased, 2.5, "kgCO2e/L", "test source", 250, true)
 
@@ -154,7 +142,7 @@ func TestMobileFuelDetail(t *testing.T) {
 }
 
 func TestMobileDistanceDetail(t *testing.T) {
-	f := newReportFixture(t, domain.CalculationRunStatusCompleted)
+	f := newReportFixture(t)
 	record := f.addMobileDistanceRecord(t, "mobile-distance", 1000, string(vocab.FuelPetrol))
 	f.addResult(t, "result-mobile-distance", record, domain.ActivityMethodDistanceBased, 0.15, "kgCO2e/km", "test source", 150, true)
 
@@ -171,7 +159,7 @@ func TestMobileDistanceDetail(t *testing.T) {
 }
 
 func TestMixedMobileMethodReturnsError(t *testing.T) {
-	f := newReportFixture(t, domain.CalculationRunStatusCompleted)
+	f := newReportFixture(t)
 	fuel := f.addMobileFuelRecord(t, "mobile-fuel", 100)
 	distance := f.addMobileDistanceRecord(t, "mobile-distance", 1000, string(vocab.FuelPetrol))
 	f.addResult(t, "result-mobile-fuel", fuel, domain.ActivityMethodFuelBased, 2.5, "kgCO2e/L", "test source", 250, true)
@@ -187,7 +175,7 @@ func TestMixedMobileMethodReturnsError(t *testing.T) {
 }
 
 func TestRefrigerantsDetail(t *testing.T) {
-	f := newReportFixture(t, domain.CalculationRunStatusCompleted)
+	f := newReportFixture(t)
 	record := f.addRefrigerantRecord(t, "refrigerant", 2)
 	f.addResult(t, "result-refrigerant", record, domain.ActivityMethodDirectGWP, 2088, "kgCO2e/kg", "test source", 4176, true)
 
@@ -204,7 +192,7 @@ func TestRefrigerantsDetail(t *testing.T) {
 }
 
 func TestScopeSummary(t *testing.T) {
-	f := newReportFixture(t, domain.CalculationRunStatusCompleted)
+	f := newReportFixture(t)
 	gas := f.addNaturalGasRecord(t, "natural-gas", 1, 100)
 	mobile := f.addMobileFuelRecord(t, "mobile-fuel", 100)
 	refrigerant := f.addRefrigerantRecord(t, "refrigerant", 2)
@@ -231,7 +219,7 @@ func TestScopeSummary(t *testing.T) {
 	assertFloat(t, *scope1.LocationBasedShare, 550.0/850.0)
 	assertFloat(t, *scope2.LocationBasedShare, 300.0/850.0)
 
-	zero := newReportFixture(t, domain.CalculationRunStatusCompleted).build(t)
+	zero := newReportFixture(t).build(t)
 	for _, row := range zero.ScopeSummary.Rows {
 		if math.IsNaN(row.PrimaryShare) || row.PrimaryShare != 0 {
 			t.Fatalf("zero-total scope row = %#v, want zero non-NaN share", row)
@@ -240,7 +228,7 @@ func TestScopeSummary(t *testing.T) {
 }
 
 func TestVectorSummary(t *testing.T) {
-	f := newReportFixture(t, domain.CalculationRunStatusCompleted)
+	f := newReportFixture(t)
 	electricity := f.addElectricityRecord(t, "electricity", 1, 1000)
 	gas := f.addNaturalGasRecord(t, "natural-gas", 1, 100)
 	mobile := f.addMobileFuelRecord(t, "mobile-fuel", 100)
@@ -265,7 +253,7 @@ func TestVectorSummary(t *testing.T) {
 }
 
 func TestNoRecalculation(t *testing.T) {
-	f := newReportFixture(t, domain.CalculationRunStatusCompleted)
+	f := newReportFixture(t)
 	record := f.addElectricityRecord(t, "electricity", 1, 1000)
 	f.addResult(t, "result-electricity", record, domain.ActivityMethodLocationBased, 0.3, "kgCO2e/kWh", "test source", 123, true)
 
@@ -305,7 +293,7 @@ type reportFixture struct {
 	now         time.Time
 }
 
-func newReportFixture(t *testing.T, status domain.CalculationRunStatus) *reportFixture {
+func newReportFixture(t *testing.T) *reportFixture {
 	t.Helper()
 	db, err := store.Open(filepath.Join(t.TempDir(), "report.sqlite"))
 	if err != nil {
@@ -322,7 +310,7 @@ func newReportFixture(t *testing.T, status domain.CalculationRunStatus) *reportF
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	f := &reportFixture{
 		store:       st,
-		builder:     NewBuilder(store.NewRepository(st)),
+		builder:     NewBuilder(st),
 		orgID:       "org-1",
 		facilityID:  "facility-1",
 		periodID:    "period-2026",
@@ -359,18 +347,14 @@ func newReportFixture(t *testing.T, status domain.CalculationRunStatus) *reportF
 	}); err != nil {
 		t.Fatalf("create factor set: %v", err)
 	}
-	var completedAt *time.Time
-	if status == domain.CalculationRunStatusCompleted {
-		completedAt = &now
-	}
+	completedAt := now
 	if err := st.CreateCalculationRun(domain.CalculationRun{
 		ID:                   f.runID,
 		OrganizationID:       f.orgID,
 		ReportingPeriodID:    f.periodID,
 		FactorSetID:          f.factorSetID,
-		Status:               status,
 		StartedAt:            now,
-		CompletedAt:          completedAt,
+		CompletedAt:          &completedAt,
 		SettingsSnapshotJSON: `{"mobile_method":"fuel_based"}`,
 	}); err != nil {
 		t.Fatalf("create calculation run: %v", err)

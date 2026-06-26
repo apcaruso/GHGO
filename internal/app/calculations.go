@@ -6,11 +6,11 @@ import (
 	"ghgo/internal/calc"
 	"ghgo/internal/domain"
 	"ghgo/internal/factors"
-	"ghgo/internal/ports"
+	"ghgo/internal/store"
 )
 
 type CalculationService struct {
-	store ports.Store
+	store *store.Store
 }
 
 type RunCalculationOptions struct {
@@ -58,7 +58,7 @@ func (s *CalculationService) GetRun(ctx context.Context, id string) (*domain.Cal
 	if err != nil {
 		return nil, err
 	}
-	return s.store.GetCalculationRun(ctx, runID)
+	return s.store.GetCalculationRun(runID)
 }
 
 func (s *CalculationService) ListRunsByPeriod(ctx context.Context, reportingPeriodID string) ([]domain.CalculationRun, error) {
@@ -69,5 +69,5 @@ func (s *CalculationService) ListRunsByPeriod(ctx context.Context, reportingPeri
 	if err != nil {
 		return nil, err
 	}
-	return s.store.ListCalculationRunsByPeriod(ctx, periodID)
+	return s.store.ListCalculationRunsByPeriod(periodID)
 }

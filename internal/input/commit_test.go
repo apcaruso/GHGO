@@ -18,7 +18,7 @@ func TestCommitElectricity(t *testing.T) {
 	raw := "January\t100\nFebruary\t200"
 	parsed := Parse(vocab.InputElectricityMonthlyKWh, raw)
 
-	result, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), fixture.commitContext(vocab.InputElectricityMonthlyKWh), parsed)
+	result, err := CommitParsedInput(context.Background(), fixture.st, fixture.commitContext(vocab.InputElectricityMonthlyKWh), parsed)
 	if err != nil {
 		t.Fatalf("commit electricity: %v", err)
 	}
@@ -30,12 +30,12 @@ func TestCommitElectricity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get paste batch: %v", err)
 	}
-	if batch.Status != domain.PasteBatchStatusCommitted || batch.CommittedAt == nil {
-		t.Fatalf("batch = %#v, want committed", batch)
+	if batch.CommittedAt == nil {
+		t.Fatalf("batch = %#v, want committed_at", batch)
 	}
 	pasteRows := requirePasteRows(t, fixture.st, result.PasteBatchID, 2)
-	if pasteRows[0].Status != domain.PasteRowStatusCommitted || pasteRows[0].ErrorsJSON != "[]" {
-		t.Fatalf("paste row = %#v, want committed with [] errors", pasteRows[0])
+	if pasteRows[0].ErrorsJSON != "[]" {
+		t.Fatalf("paste row = %#v, want [] errors", pasteRows[0])
 	}
 
 	records := requireActivityRecords(t, fixture.st, fixture.periodID, 2)
@@ -55,7 +55,7 @@ func TestCommitNaturalGas(t *testing.T) {
 	fixture := newCommitFixture(t, true)
 	parsed := Parse(vocab.InputNaturalGasMonthlySmc, "January\t30\nFebruary\t40")
 
-	_, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), fixture.commitContext(vocab.InputNaturalGasMonthlySmc), parsed)
+	_, err := CommitParsedInput(context.Background(), fixture.st, fixture.commitContext(vocab.InputNaturalGasMonthlySmc), parsed)
 	if err != nil {
 		t.Fatalf("commit natural gas: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestCommitMobileFuel(t *testing.T) {
 	parsed := Parse(vocab.InputMobileFuelLitres, "Diesel\t2000\ngasolio\t2200\nPetrol\t1000")
 	ctx := fixture.commitContext(vocab.InputMobileFuelLitres)
 
-	result, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), ctx, parsed)
+	result, err := CommitParsedInput(context.Background(), fixture.st, ctx, parsed)
 	if err != nil {
 		t.Fatalf("commit mobile fuel: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestCommitMobileFuel(t *testing.T) {
 
 	badCtx := ctx
 	badCtx.MobileMethod = domain.MobileMethodDistanceBased
-	if _, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), badCtx, parsed); err == nil {
+	if _, err := CommitParsedInput(context.Background(), fixture.st, badCtx, parsed); err == nil {
 		t.Fatalf("distance_based context accepted mobile_fuel_litres")
 	}
 }
@@ -103,7 +103,7 @@ func TestCommitVehicleDistance(t *testing.T) {
 	parsed := Parse(vocab.InputVehicleDistanceKm, "Car 1\tAA111AA\tCar\tSmall\tPetrol\t100\nVan 1\tBB222BB\tVan\tClass II\tDiesel\t200")
 	ctx := fixture.commitContext(vocab.InputVehicleDistanceKm)
 
-	_, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), ctx, parsed)
+	_, err := CommitParsedInput(context.Background(), fixture.st, ctx, parsed)
 	if err != nil {
 		t.Fatalf("commit vehicle distance: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestCommitVehicleDistance(t *testing.T) {
 
 	badCtx := ctx
 	badCtx.MobileMethod = domain.MobileMethodFuelBased
-	if _, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), badCtx, parsed); err == nil {
+	if _, err := CommitParsedInput(context.Background(), fixture.st, badCtx, parsed); err == nil {
 		t.Fatalf("fuel_based context accepted vehicle_distance_km")
 	}
 }
@@ -126,7 +126,7 @@ func TestCommitRefrigerants(t *testing.T) {
 	fixture := newCommitFixture(t, true)
 	parsed := Parse(vocab.InputRefrigerantsAnnualKg, "R410A\t3.2\nr-410a\t1.0")
 
-	result, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), fixture.commitContext(vocab.InputRefrigerantsAnnualKg), parsed)
+	result, err := CommitParsedInput(context.Background(), fixture.st, fixture.commitContext(vocab.InputRefrigerantsAnnualKg), parsed)
 	if err != nil {
 		t.Fatalf("commit refrigerants: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestParserErrorsBlockCommit(t *testing.T) {
 	fixture := newCommitFixture(t, true)
 	parsed := Parse(vocab.InputElectricityMonthlyKWh, "not-a-month\t100")
 
-	if _, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), fixture.commitContext(vocab.InputElectricityMonthlyKWh), parsed); err == nil {
+	if _, err := CommitParsedInput(context.Background(), fixture.st, fixture.commitContext(vocab.InputElectricityMonthlyKWh), parsed); err == nil {
 		t.Fatalf("commit with parser errors succeeded")
 	}
 	assertNoBatchesOrRecords(t, fixture)
@@ -159,10 +159,10 @@ func TestExistingActiveDataCanBeReplaced(t *testing.T) {
 	t.Run("monthly data replaces matching months", func(t *testing.T) {
 		fixture := newCommitFixture(t, true)
 		ctx := fixture.commitContext(vocab.InputElectricityMonthlyKWh)
-		if _, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), ctx, Parse(vocab.InputElectricityMonthlyKWh, "January\t100\nFebruary\t200")); err != nil {
+		if _, err := CommitParsedInput(context.Background(), fixture.st, ctx, Parse(vocab.InputElectricityMonthlyKWh, "January\t100\nFebruary\t200")); err != nil {
 			t.Fatalf("first commit: %v", err)
 		}
-		if _, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), ctx, Parse(vocab.InputElectricityMonthlyKWh, "January\t300")); err != nil {
+		if _, err := CommitParsedInput(context.Background(), fixture.st, ctx, Parse(vocab.InputElectricityMonthlyKWh, "January\t300")); err != nil {
 			t.Fatalf("replacement commit: %v", err)
 		}
 
@@ -196,10 +196,10 @@ func TestExistingActiveDataCanBeReplaced(t *testing.T) {
 	t.Run("period data replaces existing vector data", func(t *testing.T) {
 		fixture := newCommitFixture(t, true)
 		ctx := fixture.commitContext(vocab.InputMobileFuelLitres)
-		if _, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), ctx, Parse(vocab.InputMobileFuelLitres, "Diesel\t200\nPetrol\t50")); err != nil {
+		if _, err := CommitParsedInput(context.Background(), fixture.st, ctx, Parse(vocab.InputMobileFuelLitres, "Diesel\t200\nPetrol\t50")); err != nil {
 			t.Fatalf("first commit: %v", err)
 		}
-		if _, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), ctx, Parse(vocab.InputMobileFuelLitres, "Diesel\t300")); err != nil {
+		if _, err := CommitParsedInput(context.Background(), fixture.st, ctx, Parse(vocab.InputMobileFuelLitres, "Diesel\t300")); err != nil {
 			t.Fatalf("replacement commit: %v", err)
 		}
 
@@ -229,11 +229,11 @@ func TestCommitHashesAreStable(t *testing.T) {
 	rawA := "January\t100\nFebruary\t200"
 	rawB := "January\t100\r\nFebruary\t200"
 
-	resultA, err := CommitParsedInput(context.Background(), store.NewRepository(fixtureA.st), fixtureA.commitContext(vocab.InputElectricityMonthlyKWh), Parse(vocab.InputElectricityMonthlyKWh, rawA))
+	resultA, err := CommitParsedInput(context.Background(), fixtureA.st, fixtureA.commitContext(vocab.InputElectricityMonthlyKWh), Parse(vocab.InputElectricityMonthlyKWh, rawA))
 	if err != nil {
 		t.Fatalf("commit A: %v", err)
 	}
-	resultB, err := CommitParsedInput(context.Background(), store.NewRepository(fixtureB.st), fixtureB.commitContext(vocab.InputElectricityMonthlyKWh), Parse(vocab.InputElectricityMonthlyKWh, rawB))
+	resultB, err := CommitParsedInput(context.Background(), fixtureB.st, fixtureB.commitContext(vocab.InputElectricityMonthlyKWh), Parse(vocab.InputElectricityMonthlyKWh, rawB))
 	if err != nil {
 		t.Fatalf("commit B: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestCommitRollsBackOnInsertFailure(t *testing.T) {
 	parsed := Parse(vocab.InputElectricityMonthlyKWh, "January\t100")
 	ctx := fixture.commitContext(vocab.InputElectricityMonthlyKWh)
 
-	if _, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), ctx, parsed); err == nil {
+	if _, err := CommitParsedInput(context.Background(), fixture.st, ctx, parsed); err == nil {
 		t.Fatalf("commit with missing facility succeeded")
 	}
 	assertNoBatchesOrRecords(t, fixture)
@@ -283,7 +283,7 @@ func TestStoredMobileMethodRejectsMismatch(t *testing.T) {
 	}
 
 	parsed := Parse(vocab.InputMobileFuelLitres, "Diesel\t100")
-	if _, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), fixture.commitContext(vocab.InputMobileFuelLitres), parsed); err == nil {
+	if _, err := CommitParsedInput(context.Background(), fixture.st, fixture.commitContext(vocab.InputMobileFuelLitres), parsed); err == nil {
 		t.Fatalf("stored distance_based method accepted mobile_fuel_litres")
 	}
 	assertNoBatchesOrRecords(t, fixture)
@@ -297,7 +297,7 @@ func TestCommitUsesTrustedStoredContext(t *testing.T) {
 		parsed.RowsTotal = 99
 		parsed.RowsValid = 99
 
-		result, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), fixture.commitContext(vocab.InputElectricityMonthlyKWh), parsed)
+		result, err := CommitParsedInput(context.Background(), fixture.st, fixture.commitContext(vocab.InputElectricityMonthlyKWh), parsed)
 		if err != nil {
 			t.Fatalf("commit electricity: %v", err)
 		}
@@ -318,7 +318,7 @@ func TestCommitUsesTrustedStoredContext(t *testing.T) {
 		ctx.PeriodStart = time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
 		ctx.PeriodEnd = time.Date(2030, 12, 31, 0, 0, 0, 0, time.UTC)
 
-		if _, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), ctx, Parse(vocab.InputElectricityMonthlyKWh, "January\t100")); err != nil {
+		if _, err := CommitParsedInput(context.Background(), fixture.st, ctx, Parse(vocab.InputElectricityMonthlyKWh, "January\t100")); err != nil {
 			t.Fatalf("commit electricity: %v", err)
 		}
 
@@ -335,7 +335,7 @@ func TestCommitUsesTrustedStoredContext(t *testing.T) {
 		ctx := fixture.commitContext(vocab.InputElectricityMonthlyKWh)
 		ctx.OrganizationID = "other-org"
 
-		_, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), ctx, Parse(vocab.InputElectricityMonthlyKWh, "January\t100"))
+		_, err := CommitParsedInput(context.Background(), fixture.st, ctx, Parse(vocab.InputElectricityMonthlyKWh, "January\t100"))
 		if !errors.Is(err, ErrInvalidCommit) {
 			t.Fatalf("commit error = %v, want ErrInvalidCommit", err)
 		}
@@ -356,7 +356,7 @@ func TestCommitUsesTrustedStoredContext(t *testing.T) {
 
 		ctx := fixture.commitContext(vocab.InputNaturalGasMonthlySmc)
 		ctx.FacilityID = &otherFacilityID
-		_, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), ctx, Parse(vocab.InputNaturalGasMonthlySmc, "January\t100"))
+		_, err := CommitParsedInput(context.Background(), fixture.st, ctx, Parse(vocab.InputNaturalGasMonthlySmc, "January\t100"))
 		if !errors.Is(err, ErrInvalidCommit) {
 			t.Fatalf("commit error = %v, want ErrInvalidCommit", err)
 		}
@@ -384,7 +384,7 @@ func TestSavedDataDisplayQueries(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fixture := newCommitFixture(t, true)
 			parsed := Parse(tt.kind, tt.raw)
-			if _, err := CommitParsedInput(context.Background(), store.NewRepository(fixture.st), fixture.commitContext(tt.kind), parsed); err != nil {
+			if _, err := CommitParsedInput(context.Background(), fixture.st, fixture.commitContext(tt.kind), parsed); err != nil {
 				t.Fatalf("commit %s: %v", tt.name, err)
 			}
 

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"ghgo/internal/domain"
 )
@@ -13,8 +12,8 @@ func (s *Store) CreatePasteBatch(batch domain.PasteBatch) error {
 	_, err := s.exec(
 		`INSERT INTO paste_batches (
   id, organization_id, reporting_period_id, input_kind, context_json, raw_text, raw_hash,
-  status, rows_total, rows_valid, rows_error, created_at, committed_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  rows_total, rows_valid, rows_error, created_at, committed_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		batch.ID,
 		batch.OrganizationID,
 		batch.ReportingPeriodID,
@@ -22,7 +21,6 @@ func (s *Store) CreatePasteBatch(batch domain.PasteBatch) error {
 		batch.ContextJSON,
 		batch.RawText,
 		batch.RawHash,
-		string(batch.Status),
 		batch.RowsTotal,
 		batch.RowsValid,
 		batch.RowsError,
@@ -38,7 +36,7 @@ func (s *Store) CreatePasteBatch(batch domain.PasteBatch) error {
 func (s *Store) GetPasteBatch(id domain.ID) (*domain.PasteBatch, error) {
 	batch, err := scanPasteBatch(s.queryRow(
 		`SELECT id, organization_id, reporting_period_id, input_kind, context_json, raw_text, raw_hash,
-status, rows_total, rows_valid, rows_error, created_at, committed_at
+rows_total, rows_valid, rows_error, created_at, committed_at
 FROM paste_batches WHERE id = ?`,
 		id,
 	))
@@ -54,7 +52,7 @@ FROM paste_batches WHERE id = ?`,
 func (s *Store) ListPasteBatchesByPeriod(reportingPeriodID domain.ID) ([]domain.PasteBatch, error) {
 	rows, err := s.query(
 		`SELECT id, organization_id, reporting_period_id, input_kind, context_json, raw_text, raw_hash,
-status, rows_total, rows_valid, rows_error, created_at, committed_at
+rows_total, rows_valid, rows_error, created_at, committed_at
 FROM paste_batches WHERE reporting_period_id = ? ORDER BY created_at, id`,
 		reportingPeriodID,
 	)
@@ -78,22 +76,8 @@ FROM paste_batches WHERE reporting_period_id = ? ORDER BY created_at, id`,
 	return batches, nil
 }
 
-func (s *Store) MarkPasteBatchCommitted(id domain.ID, committedAt time.Time) error {
-	_, err := s.exec(
-		`UPDATE paste_batches SET status = ?, committed_at = ? WHERE id = ?`,
-		string(domain.PasteBatchStatusCommitted),
-		formatTime(committedAt),
-		id,
-	)
-	if err != nil {
-		return fmt.Errorf("mark paste batch committed: %w", err)
-	}
-	return nil
-}
-
 func scanPasteBatch(row scanner) (*domain.PasteBatch, error) {
 	var batch domain.PasteBatch
-	var status string
 	var createdAt string
 	var committedAt sql.NullString
 	if err := row.Scan(
@@ -104,7 +88,6 @@ func scanPasteBatch(row scanner) (*domain.PasteBatch, error) {
 		&batch.ContextJSON,
 		&batch.RawText,
 		&batch.RawHash,
-		&status,
 		&batch.RowsTotal,
 		&batch.RowsValid,
 		&batch.RowsError,
@@ -118,7 +101,6 @@ func scanPasteBatch(row scanner) (*domain.PasteBatch, error) {
 	}
 
 	var err error
-	batch.Status = domain.PasteBatchStatus(status)
 	batch.CreatedAt, err = parseTime(createdAt)
 	if err != nil {
 		return nil, err

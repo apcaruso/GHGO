@@ -37,7 +37,7 @@ func New(services *app.Services) http.Handler {
 	mux.HandleFunc("GET /factor-sets/default", s.getDefaultFactorSet)
 	mux.HandleFunc("GET /factor-sets/{id}", s.getFactorSet)
 
-	return withJSONFallback(mux)
+	return mux
 }
 
 func (s *server) healthz(w http.ResponseWriter, r *http.Request) {
@@ -290,7 +290,7 @@ func (s *server) getReportTables(w http.ResponseWriter, r *http.Request) {
 		writeServiceError(w, err)
 		return
 	}
-	writeData(w, http.StatusOK, newReportTablesResponse(tables))
+	writeData(w, http.StatusOK, tables)
 }
 
 func (s *server) listFactorSets(w http.ResponseWriter, r *http.Request) {

@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"ghgo/internal/domain"
-	"ghgo/internal/ports"
+	"ghgo/internal/store"
 )
 
 type OrganizationService struct {
-	store ports.Store
+	store *store.Store
 }
 
 type CreateOrganizationOptions struct {
@@ -43,7 +43,7 @@ func (s *OrganizationService) Create(ctx context.Context, opts CreateOrganizatio
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	if err := s.store.CreateOrganization(ctx, organization); err != nil {
+	if err := s.store.CreateOrganization(organization); err != nil {
 		return nil, err
 	}
 	return &organization, nil
@@ -57,12 +57,12 @@ func (s *OrganizationService) Get(ctx context.Context, id string) (*domain.Organ
 	if err != nil {
 		return nil, err
 	}
-	return s.store.GetOrganization(ctx, organizationID)
+	return s.store.GetOrganization(organizationID)
 }
 
 func (s *OrganizationService) List(ctx context.Context) ([]domain.Organization, error) {
 	if err := checkStore(ctx, s.store); err != nil {
 		return nil, err
 	}
-	return s.store.ListOrganizations(ctx)
+	return s.store.ListOrganizations()
 }

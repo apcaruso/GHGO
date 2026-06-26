@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"ghgo/internal/domain"
-	"ghgo/internal/ports"
+	"ghgo/internal/store"
 	"ghgo/internal/vocab"
 )
 
@@ -17,11 +17,11 @@ var ErrUnsupportedActivity = errors.New("unsupported activity")
 const ghgKgCO2e = "kgCO2e"
 
 type Lookup struct {
-	Store       ports.FactorStore
+	Store       *store.Store
 	FactorSetID string
 }
 
-func NewLookup(st ports.FactorStore, factorSetID string) *Lookup {
+func NewLookup(st *store.Store, factorSetID string) *Lookup {
 	return &Lookup{Store: st, FactorSetID: factorSetID}
 }
 
@@ -76,7 +76,7 @@ func (l *Lookup) FindElectricityLocationFactor(ctx context.Context) (*domain.Emi
 	unit := string(vocab.UnitKWh)
 	factorUnit := "kgCO2e/kWh"
 	ghg := ghgKgCO2e
-	return l.findExactlyOne(ctx, ports.EmissionFactorQuery{
+	return l.findExactlyOne(ctx, store.EmissionFactorQuery{
 		FactorSetID:  l.FactorSetID,
 		Scope:        &scope,
 		ActivityType: &activityType,
@@ -94,7 +94,7 @@ func (l *Lookup) FindNaturalGasFactor(ctx context.Context, unit string) (*domain
 	activityType := "natural_gas"
 	factorUnit := "kgCO2e/Smc"
 	ghg := ghgKgCO2e
-	return l.findExactlyOne(ctx, ports.EmissionFactorQuery{
+	return l.findExactlyOne(ctx, store.EmissionFactorQuery{
 		FactorSetID:  l.FactorSetID,
 		Scope:        &scope,
 		ActivityType: &activityType,
@@ -121,7 +121,7 @@ func (l *Lookup) findMobileFuelFactor(ctx context.Context, fuelType string, unit
 	scope := int(domain.Scope1)
 	factorUnit := "kgCO2e/L"
 	ghg := ghgKgCO2e
-	return l.findExactlyOne(ctx, ports.EmissionFactorQuery{
+	return l.findExactlyOne(ctx, store.EmissionFactorQuery{
 		FactorSetID:  l.FactorSetID,
 		Scope:        &scope,
 		ActivityType: &activityType,
@@ -165,7 +165,7 @@ func (l *Lookup) findVehicleDistanceFactor(ctx context.Context, vehicleType stri
 	activityType := "vehicle_distance"
 	factorUnit := "kgCO2e/km"
 	ghg := ghgKgCO2e
-	return l.findExactlyOne(ctx, ports.EmissionFactorQuery{
+	return l.findExactlyOne(ctx, store.EmissionFactorQuery{
 		FactorSetID:      l.FactorSetID,
 		Scope:            &scope,
 		ActivityType:     &activityType,
@@ -183,7 +183,7 @@ func (l *Lookup) findMotorbikeFactor(ctx context.Context, vehicleType string, si
 	activityType := "vehicle_distance"
 	factorUnit := "kgCO2e/km"
 	ghg := ghgKgCO2e
-	factors, err := l.find(ctx, ports.EmissionFactorQuery{
+	factors, err := l.find(ctx, store.EmissionFactorQuery{
 		FactorSetID:      l.FactorSetID,
 		Scope:            &scope,
 		ActivityType:     &activityType,
@@ -236,7 +236,7 @@ func (l *Lookup) FindRefrigerantFactor(ctx context.Context, substance string, un
 	activityType := "refrigerant_leakage"
 	factorUnit := "kgCO2e/kg"
 	ghg := ghgKgCO2e
-	return l.findExactlyOne(ctx, ports.EmissionFactorQuery{
+	return l.findExactlyOne(ctx, store.EmissionFactorQuery{
 		FactorSetID:  l.FactorSetID,
 		Scope:        &scope,
 		ActivityType: &activityType,
@@ -247,7 +247,7 @@ func (l *Lookup) FindRefrigerantFactor(ctx context.Context, substance string, un
 	})
 }
 
-func (l *Lookup) findExactlyOne(ctx context.Context, q ports.EmissionFactorQuery) (*domain.EmissionFactor, error) {
+func (l *Lookup) findExactlyOne(ctx context.Context, q store.EmissionFactorQuery) (*domain.EmissionFactor, error) {
 	factors, err := l.find(ctx, q)
 	if err != nil {
 		return nil, err
@@ -255,7 +255,7 @@ func (l *Lookup) findExactlyOne(ctx context.Context, q ports.EmissionFactorQuery
 	return exactOne(factors)
 }
 
-func (l *Lookup) find(ctx context.Context, q ports.EmissionFactorQuery) ([]domain.EmissionFactor, error) {
+func (l *Lookup) find(ctx context.Context, q store.EmissionFactorQuery) ([]domain.EmissionFactor, error) {
 	if l == nil || l.Store == nil {
 		return nil, fmt.Errorf("store is required")
 	}

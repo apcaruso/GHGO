@@ -75,15 +75,13 @@ Known limitations:
 - Report tables exist, but polished report generation, printing, and export workflows are not complete.
 - Chart dataset tables exist, but graph rendering, printing, and exporting are not implemented.
 - Supported activity categories and conversion factors are intentionally limited.
-- The current storage implementation is SQLite-only; storage interfaces for alternate implementations are planned.
+- The current storage implementation is SQLite-only.
 - Data entry is based on pasted spreadsheet text rather than full file import workflows or API payloads.
-- The DEFRA factor import path exists in development code, but it is not exposed as a standard application command.
 - The architecture is still in transition from the removed desktop frontend toward backend services.
 
 ## Planned Work / TODO
 
 - Expand API endpoint coverage and harden API documentation.
-- Add storage interfaces and keep SQLite as one implementation.
 - Add report generation/export workflows.
 - Add graph dataset/export workflows.
 - Add support for more conversion factors.
@@ -102,21 +100,19 @@ Install dependencies:
 go mod download
 ```
 
-Initialize the backend database:
-
-```sh
-go run ./cmd/ghgo
-```
-
-The command opens the configured database, runs migrations, ensures the default DEFRA/DESNZ 2025 factor set exists, prints the initialized database path, and exits.
-
 Run the HTTP API:
 
 ```sh
 go run ./cmd/ghgo-api
 ```
 
-The API command opens the configured database, runs migrations, seeds the default factor set, and serves HTTP until stopped.
+The API command opens the configured database, runs migrations, seeds the default factor set, and serves HTTP until stopped. A no-build browser UI is served from the same origin at:
+
+```text
+http://127.0.0.1:8080/ui/
+```
+
+By default the API command looks for the UI in `../frontend` or `frontend`, relative to the process working directory. Override this with `GHGO_UI_DIR=/path/to/frontend` when running from another layout.
 
 By default, ghgo stores its local SQLite database at:
 
@@ -127,7 +123,7 @@ By default, ghgo stores its local SQLite database at:
 Override the database path:
 
 ```sh
-GHGO_DB_PATH=/custom/path/ghgo.sqlite go run ./cmd/ghgo
+GHGO_DB_PATH=/custom/path/ghgo.sqlite go run ./cmd/ghgo-api
 ```
 
 Override the API listen address:
@@ -195,17 +191,14 @@ go test ./...
 Build a local binary:
 
 ```sh
-go build ./cmd/ghgo
 go build ./cmd/ghgo-api
 ```
 
 ## Repository Structure
 
-- `cmd/ghgo`: backend initialization entry point; opens SQLite, runs migrations, and seeds default factors.
 - `cmd/ghgo-api`: HTTP API entry point; opens SQLite, runs migrations, seeds default factors, and serves the API.
 - `internal/app`: API-facing use-case services and backend bootstrap wiring.
 - `internal/httpapi`: standard-library HTTP adapter for `internal/app` services.
-- `internal/ports`: context-aware storage interfaces used by use cases, calculation, input, factors, and reports.
 - `internal/input`: parsers, validators, normalization, hashing, and commit logic for pasted activity data.
 - `internal/calc`: calculation engine that converts active activity records into calculation results.
 - `internal/report`: deterministic report table builders for completed calculation runs.
@@ -226,7 +219,6 @@ go build ./cmd/ghgo-api
 - Run `go test -tags ghgo_devtools ./internal/factors` after changing DEFRA import or mapping code.
 - Add schema changes as new files under `migrations`; migrations are embedded through `migrations/embed.go`.
 - Keep HTTP handlers transport-only: decode requests, fill path IDs, call `internal/app`, and encode JSON responses.
-- Add alternate persistence implementations by satisfying `internal/ports.Store`.
 - Implement report generation/export work in or near `internal/report`.
 - Implement graph data and export work near `internal/report`, reusing existing chart dataset tables where practical.
 - Add or update default emission factors by editing checked-in factor-pack JSON under `factorpacks`; update `internal/factors`, `internal/vocab`, `internal/store`, and calculation code only when the normalized schema or lookup behavior needs to change.

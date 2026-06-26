@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"ghgo/internal/app"
+	"ghgo/internal/report"
 	"ghgo/internal/vocab"
 )
 
@@ -67,12 +68,10 @@ func TestAPIErrorMapping(t *testing.T) {
 		t.Fatalf("invalid JSON error = %#v, want malformed_json", envelope.Error)
 	}
 
-	status, envelope = requestJSON(t, handler, http.MethodPut, "/organizations", createOrganizationRequest{Name: "Acme Ltd"})
-	if status != http.StatusMethodNotAllowed {
-		t.Fatalf("unsupported method status = %d, want %d: %s", status, http.StatusMethodNotAllowed, envelopeText(envelope))
-	}
-	if envelope.Error == nil || envelope.Error.Code != "method_not_allowed" {
-		t.Fatalf("unsupported method error = %#v, want method_not_allowed", envelope.Error)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/organizations", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("unsupported method status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
 	}
 
 	status, envelope = requestRaw(t, handler, http.MethodPost, "/inputs/commit", `{"context":{},"parsed":{}}`)
@@ -148,15 +147,15 @@ func TestNaturalGasWorkflow(t *testing.T) {
 	}
 	var run calculationRunResponse
 	decodeData(t, envelope, &run)
-	if run.ID != calculation.CalculationRunID || run.Status != "completed" {
-		t.Fatalf("calculation run = %#v, want completed run", run)
+	if run.ID != calculation.CalculationRunID {
+		t.Fatalf("calculation run = %#v, want created run", run)
 	}
 
 	status, envelope = requestJSON(t, handler, http.MethodGet, "/calculation-runs/"+calculation.CalculationRunID+"/report-tables", nil)
 	if status != http.StatusOK {
 		t.Fatalf("report tables status = %d, want %d: %s", status, http.StatusOK, envelopeText(envelope))
 	}
-	var tables reportTablesResponse
+	var tables report.ReportTables
 	decodeData(t, envelope, &tables)
 	if tables.CalculationRunID != calculation.CalculationRunID || tables.ExecutiveSummary.PrimaryTotalKgCO2e != calculation.PrimaryTotalKgCO2e {
 		t.Fatalf("report tables = %#v, want matching calculation total", tables.ExecutiveSummary)

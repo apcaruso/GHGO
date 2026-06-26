@@ -1,6 +1,6 @@
 package app
 
-import "ghgo/internal/ports"
+import "ghgo/internal/store"
 
 type Services struct {
 	Organizations    *OrganizationService
@@ -12,7 +12,7 @@ type Services struct {
 	Factors          *FactorService
 }
 
-func NewServices(st ports.Store) (*Services, error) {
+func NewServices(st *store.Store) (*Services, error) {
 	if st == nil {
 		return nil, invalidOptions("store is required")
 	}

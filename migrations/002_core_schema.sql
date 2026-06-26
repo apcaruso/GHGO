@@ -117,7 +117,6 @@ CREATE TABLE IF NOT EXISTS paste_batches (
   context_json TEXT NOT NULL,
   raw_text TEXT NOT NULL,
   raw_hash TEXT NOT NULL,
-  status TEXT NOT NULL,
   rows_total INTEGER NOT NULL,
   rows_valid INTEGER NOT NULL,
   rows_error INTEGER NOT NULL,
@@ -136,7 +135,6 @@ CREATE TABLE IF NOT EXISTS paste_rows (
   row_number INTEGER NOT NULL,
   raw_json TEXT NOT NULL,
   normalized_json TEXT NOT NULL,
-  status TEXT NOT NULL,
   errors_json TEXT NOT NULL,
   warnings_json TEXT NOT NULL,
   activity_record_id TEXT NULL,
@@ -193,7 +191,6 @@ CREATE TABLE IF NOT EXISTS calculation_runs (
   organization_id TEXT NOT NULL,
   reporting_period_id TEXT NOT NULL,
   factor_set_id TEXT NOT NULL,
-  status TEXT NOT NULL,
   started_at TEXT NOT NULL,
   completed_at TEXT NULL,
   settings_snapshot_json TEXT NOT NULL,
@@ -204,8 +201,6 @@ CREATE TABLE IF NOT EXISTS calculation_runs (
 
 CREATE INDEX IF NOT EXISTS idx_calculation_runs_reporting_period_id ON calculation_runs (reporting_period_id);
 CREATE INDEX IF NOT EXISTS idx_calculation_runs_factor_set_id ON calculation_runs (factor_set_id);
-CREATE INDEX IF NOT EXISTS idx_calculation_runs_status ON calculation_runs (status);
-
 CREATE TABLE IF NOT EXISTS calculation_results (
   id TEXT PRIMARY KEY,
   calculation_run_id TEXT NOT NULL,
@@ -233,16 +228,3 @@ CREATE INDEX IF NOT EXISTS idx_calculation_results_run_scope ON calculation_resu
 CREATE INDEX IF NOT EXISTS idx_calculation_results_run_method ON calculation_results (calculation_run_id, method);
 CREATE INDEX IF NOT EXISTS idx_calculation_results_run_is_primary ON calculation_results (calculation_run_id, is_primary);
 
-CREATE TABLE IF NOT EXISTS audit_events (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  entity_type TEXT NOT NULL,
-  entity_id TEXT NOT NULL,
-  action TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE RESTRICT
-);
-
-CREATE INDEX IF NOT EXISTS idx_audit_events_organization_id ON audit_events (organization_id);
-CREATE INDEX IF NOT EXISTS idx_audit_events_entity ON audit_events (entity_type, entity_id);

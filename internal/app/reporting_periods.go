@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"ghgo/internal/domain"
-	"ghgo/internal/ports"
+	"ghgo/internal/store"
 )
 
 type ReportingPeriodService struct {
-	store ports.Store
+	store *store.Store
 }
 
 type CreateReportingPeriodOptions struct {
@@ -50,7 +50,7 @@ func (s *ReportingPeriodService) Create(ctx context.Context, opts CreateReportin
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.store.GetOrganization(ctx, organizationID); err != nil {
+	if _, err := s.store.GetOrganization(organizationID); err != nil {
 		return nil, err
 	}
 	if opts.Year <= 0 {
@@ -95,7 +95,7 @@ func (s *ReportingPeriodService) Create(ctx context.Context, opts CreateReportin
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	if err := s.store.CreateReportingPeriod(ctx, period); err != nil {
+	if err := s.store.CreateReportingPeriod(period); err != nil {
 		return nil, err
 	}
 	return &period, nil
@@ -109,7 +109,7 @@ func (s *ReportingPeriodService) Get(ctx context.Context, id string) (*domain.Re
 	if err != nil {
 		return nil, err
 	}
-	return s.store.GetReportingPeriod(ctx, periodID)
+	return s.store.GetReportingPeriod(periodID)
 }
 
 func (s *ReportingPeriodService) ListByOrganization(ctx context.Context, organizationID string) ([]domain.ReportingPeriod, error) {
@@ -120,7 +120,7 @@ func (s *ReportingPeriodService) ListByOrganization(ctx context.Context, organiz
 	if err != nil {
 		return nil, err
 	}
-	return s.store.ListReportingPeriodsByOrganization(ctx, id)
+	return s.store.ListReportingPeriodsByOrganization(id)
 }
 
 func (s *ReportingPeriodService) UpsertSettings(ctx context.Context, opts UpsertReportingPeriodSettingsOptions) (*domain.ReportingPeriodSettings, error) {
@@ -132,7 +132,7 @@ func (s *ReportingPeriodService) UpsertSettings(ctx context.Context, opts Upsert
 	if err != nil {
 		return nil, err
 	}
-	period, err := s.store.GetReportingPeriod(ctx, reportingPeriodID)
+	period, err := s.store.GetReportingPeriod(reportingPeriodID)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +162,7 @@ func (s *ReportingPeriodService) UpsertSettings(ctx context.Context, opts Upsert
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
-	if err := s.store.UpsertReportingPeriodSettings(ctx, settings); err != nil {
+	if err := s.store.UpsertReportingPeriodSettings(settings); err != nil {
 		return nil, err
 	}
 	return &settings, nil
@@ -176,7 +176,7 @@ func (s *ReportingPeriodService) GetSettings(ctx context.Context, reportingPerio
 	if err != nil {
 		return nil, err
 	}
-	return s.store.GetReportingPeriodSettings(ctx, id)
+	return s.store.GetReportingPeriodSettings(id)
 }
 
 func (s *ReportingPeriodService) UpsertElectricitySettings(ctx context.Context, opts UpsertElectricitySettingsOptions) (*domain.ElectricitySettings, error) {
@@ -192,7 +192,7 @@ func (s *ReportingPeriodService) UpsertElectricitySettings(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	period, err := s.store.GetReportingPeriod(ctx, reportingPeriodID)
+	period, err := s.store.GetReportingPeriod(reportingPeriodID)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +247,7 @@ func (s *ReportingPeriodService) UpsertElectricitySettings(ctx context.Context, 
 		CreatedAt:             now,
 		UpdatedAt:             now,
 	}
-	if err := s.store.UpsertElectricitySettings(ctx, settings); err != nil {
+	if err := s.store.UpsertElectricitySettings(settings); err != nil {
 		return nil, err
 	}
 	return &settings, nil
@@ -265,5 +265,5 @@ func (s *ReportingPeriodService) GetElectricitySettings(ctx context.Context, rep
 	if err != nil {
 		return nil, err
 	}
-	return s.store.GetElectricitySettings(ctx, periodID, facility)
+	return s.store.GetElectricitySettings(periodID, facility)
 }

@@ -235,7 +235,6 @@ func TestStoreCoreEntities(t *testing.T) {
 		OrganizationID:       organization.ID,
 		ReportingPeriodID:    period.ID,
 		FactorSetID:          factorSet.ID,
-		Status:               domain.CalculationRunStatusRunning,
 		StartedAt:            now,
 		SettingsSnapshotJSON: `{}`,
 	}
@@ -250,8 +249,8 @@ func TestStoreCoreEntities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get calculation run: %v", err)
 	}
-	if gotCalculationRun.Status != domain.CalculationRunStatusCompleted || gotCalculationRun.CompletedAt == nil {
-		t.Fatalf("calculation run = %#v, want completed", gotCalculationRun)
+	if gotCalculationRun.CompletedAt == nil {
+		t.Fatalf("calculation run = %#v, want completed_at", gotCalculationRun)
 	}
 
 	factorID := domain.ID(emissionFactor.ID)
@@ -291,7 +290,6 @@ func TestStoreCoreEntities(t *testing.T) {
 		ContextJSON:       `{}`,
 		RawText:           "raw",
 		RawHash:           "paste-hash-1",
-		Status:            domain.PasteBatchStatusParsed,
 		RowsTotal:         1,
 		RowsValid:         1,
 		RowsError:         0,
@@ -314,7 +312,6 @@ func TestStoreCoreEntities(t *testing.T) {
 		RowNumber:        1,
 		RawJSON:          `{}`,
 		NormalizedJSON:   `{}`,
-		Status:           domain.PasteRowStatusCommitted,
 		ErrorsJSON:       `[]`,
 		WarningsJSON:     `[]`,
 		ActivityRecordID: &activityRecordID,
@@ -330,25 +327,6 @@ func TestStoreCoreEntities(t *testing.T) {
 		t.Fatalf("paste rows = %#v, want linked activity record", pasteRows)
 	}
 
-	auditEvent := domain.AuditEvent{
-		ID:             "audit-1",
-		OrganizationID: organization.ID,
-		EntityType:     "activity_record",
-		EntityID:       activeRecord.ID,
-		Action:         "create",
-		PayloadJSON:    `{}`,
-		CreatedAt:      now,
-	}
-	if err := store.CreateAuditEvent(auditEvent); err != nil {
-		t.Fatalf("create audit event: %v", err)
-	}
-	auditEvents, err := store.ListAuditEventsByEntity(auditEvent.EntityType, auditEvent.EntityID)
-	if err != nil {
-		t.Fatalf("list audit events: %v", err)
-	}
-	if len(auditEvents) != 1 || auditEvents[0].ID != auditEvent.ID {
-		t.Fatalf("audit events = %#v, want %q", auditEvents, auditEvent.ID)
-	}
 }
 
 func newTestStore(t *testing.T) *Store {

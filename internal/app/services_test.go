@@ -8,7 +8,7 @@ import (
 
 	"ghgo/internal/domain"
 	"ghgo/internal/input"
-	"ghgo/internal/ports"
+	"ghgo/internal/store"
 	"ghgo/internal/vocab"
 )
 
@@ -163,8 +163,8 @@ func TestServiceValidation(t *testing.T) {
 	}
 
 	_, err = backend.Services.Organizations.Get(context.Background(), "missing")
-	if !errors.Is(err, ports.ErrNotFound) {
-		t.Fatalf("get missing organization error = %v, want ports.ErrNotFound", err)
+	if !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("get missing organization error = %v, want store.ErrNotFound", err)
 	}
 }
 
